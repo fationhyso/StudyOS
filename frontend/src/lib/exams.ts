@@ -30,3 +30,22 @@ export function useExams(userId: number) {
   };
   return { exams, saveExams };
 }
+
+export function useExamPeriod(userId: number) {
+  const key = `studyos.exam-period.${userId}`;
+  const read = (): string | null => {
+    try { const value = localStorage.getItem(key); return value && /^\d{4}-\d{2}-\d{2}$/.test(value) && isValid(parseISO(value)) ? value : null; } catch { return null; }
+  };
+  const [startDate, setStartDate] = useState(read);
+  useEffect(() => {
+    const refresh = () => setStartDate(read());
+    refresh();
+    window.addEventListener('storage', refresh); window.addEventListener('studyos:exam-period', refresh);
+    return () => { window.removeEventListener('storage', refresh); window.removeEventListener('studyos:exam-period', refresh); };
+  }, [key]);
+  const saveStartDate = (value: string | null) => {
+    if (value) localStorage.setItem(key, value); else localStorage.removeItem(key);
+    setStartDate(value); window.dispatchEvent(new Event('studyos:exam-period'));
+  };
+  return { startDate, saveStartDate };
+}

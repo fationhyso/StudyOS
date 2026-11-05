@@ -5,10 +5,13 @@ import { useToast } from '../context/ToastContext';
 import { localDateString } from '../lib/utils';
 import SessionDatePicker from './SessionDatePicker';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useExams, type Exam } from '../lib/exams';
+import { useExams, useExamPeriod, type Exam } from '../lib/exams';
 import { Button, Modal } from './ui';
 
 export default function ExamCountdown({ userId }: { userId: number }) {
+  const { startDate, saveStartDate } = useExamPeriod(userId);
+  const [periodEditing, setPeriodEditing] = useState(false);
+  const [periodDate, setPeriodDate] = useState(localDateString());
   const { exams, saveExams } = useExams(userId);
   const [searchParams] = useSearchParams();
   const [handledExam, setHandledExam] = useState<string | null>(null);
@@ -27,10 +30,11 @@ export default function ExamCountdown({ userId }: { userId: number }) {
   }, []);
   useEffect(() => {
     const id = searchParams.get('exam');
+    if (searchParams.get('examPeriod') === '1' && handledExam !== 'period') { setPeriodDate(startDate ?? localDateString()); setPeriodEditing(true); setHandledExam('period'); return; }
     if (searchParams.get('newExam') === '1' && handledExam !== 'new') { setEditingId(null); setName(''); setDate(localDateString()); setEditing(true); setHandledExam('new'); return; }
     const exam = exams.find(item => item.id === id);
     if (exam && id !== handledExam) { setEditingId(exam.id); setName(exam.name); setDate(exam.date); setEditing(true); setHandledExam(id); }
-  }, [searchParams, exams, handledExam]);
+  }, [searchParams, exams, handledExam, startDate]);
   const openSetup = (exam?: Exam) => { setManaging(false); setEditingId(exam?.id ?? null); setName(exam?.name || ''); setDate(exam?.date ?? localDateString()); setEditing(true); };
   const save = (event: FormEvent) => {
     event.preventDefault();
@@ -45,16 +49,15 @@ export default function ExamCountdown({ userId }: { userId: number }) {
     catch { toast('Could not remove your countdown', 'error'); }
   };
   const sortedExams = [...exams].sort((a, b) => Number(a.date < today) - Number(b.date < today) || a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
-  const nextExam = sortedExams.find(exam => exam.date >= today);
-  const daysLeft = nextExam ? differenceInCalendarDays(parseISO(nextExam.date), parseISO(today)) : null;
+  const daysLeft = startDate ? differenceInCalendarDays(parseISO(startDate), parseISO(today)) : null;
+  const openPeriod = () => { setPeriodDate(startDate ?? localDateString()); setPeriodEditing(true); };
   return <>
-    <section aria-label="Exam countdowns" className="card min-w-0 p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-2"><h3 className="text-xs font-medium text-muted">Exam countdown</h3><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent dark:bg-accent-dark/40"><GraduationCap size={16} /></span></div>
-      {nextExam ? <>
-        <button className="mt-1 block w-full text-left" title={`Edit ${nextExam.name}`} onClick={() => openSetup(nextExam)}><span className="block text-2xl font-semibold tracking-[-.04em]">{daysLeft === 0 ? 'Today' : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}`}</span><span className="mt-1 block truncate text-[11px] text-muted">{nextExam.name} · {format(parseISO(nextExam.date), 'd MMM')}</span></button>
-        <button className="mt-2 text-[11px] font-medium text-accent hover:underline" onClick={() => setManaging(true)}>Manage exams ({exams.length})</button>
-      </> : <><p className="mt-1 text-sm font-semibold">{exams.length ? 'Set your next date' : 'When are your exams?'}</p><button className="mt-2 text-xs font-medium text-accent hover:underline" onClick={() => exams.length ? setManaging(true) : openSetup()}>{exams.length ? 'Manage exams' : 'Set up exams'}</button></>}
+    <section aria-label="Exam period countdown" className="card min-w-0 p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-2"><h3 className="text-xs font-medium text-muted">Exam period</h3><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent dark:bg-accent-dark/40"><GraduationCap size={16} /></span></div>
+      {startDate ? <button className="mt-1 block w-full text-left" onClick={openPeriod} title="Edit exam period start date"><span className="block text-2xl font-semibold tracking-[-.04em]">{daysLeft! < 0 ? 'Started' : daysLeft === 0 ? 'Today' : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}`}</span><span className="mt-1 block text-[11px] text-muted">{daysLeft! > 0 ? 'Starts' : 'Started'} {format(parseISO(startDate), 'd MMM yyyy')}</span></button> : <button className="mt-2 text-left text-xs font-medium text-accent hover:underline" onClick={openPeriod}>Set exam period start date</button>}
+      <button className="mt-2 text-[11px] font-medium text-accent hover:underline" onClick={() => setManaging(true)}>Individual exams ({exams.length})</button>
     </section>
+    {periodEditing && <Modal title="Exam period start date" description="Count down to the first day of your exam period." onClose={() => setPeriodEditing(false)}><form className="space-y-4" onSubmit={event => { event.preventDefault(); if (!isValid(parseISO(periodDate))) return; try { saveStartDate(periodDate); setPeriodEditing(false); } catch { toast('Could not save your exam period', 'error'); } }}><div><label className="label" htmlFor="period-date">Starting day</label><SessionDatePicker id="period-date" value={periodDate} onChange={setPeriodDate} /><p className="mt-2 text-[11px] text-muted">Saved in this browser for your account.</p></div><div className="flex justify-between gap-2"><div>{startDate && <Button type="button" variant="ghost" onClick={() => { try { saveStartDate(null); setPeriodEditing(false); } catch { toast('Could not remove your exam period', 'error'); } }}>Remove</Button>}</div><div className="flex gap-2"><Button type="button" variant="ghost" onClick={() => setPeriodEditing(false)}>Cancel</Button><Button type="submit">Save start date</Button></div></div></form></Modal>}
     {managing && <Modal title="Your exams" description="Upcoming exams appear first." onClose={() => setManaging(false)}>
       <div className="mb-3 flex justify-end"><Button variant="secondary" className="h-9 px-3 text-xs" onClick={() => openSetup()} icon={<Plus size={15} />}>Add exam</Button></div>
       {sortedExams.length > 0 && <div className="max-h-80 divide-y divide-line overflow-y-auto border-t border-line">{sortedExams.map(exam => {

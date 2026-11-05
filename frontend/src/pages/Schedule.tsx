@@ -10,7 +10,7 @@ import SessionModal from '../components/SessionModal';
 import { Button, EmptyState } from '../components/ui';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
-import { useExams, type Exam } from '../lib/exams';
+import { useExams, useExamPeriod, type Exam } from '../lib/exams';
 import { api } from '../lib/api';
 import { cn, formatMinutes, formatTime, localDateString, sessionColors } from '../lib/utils';
 import type { StudyDocument, StudySession } from '../types';
@@ -28,7 +28,7 @@ function SessionCard({ session, onEdit, onToggle }: { session: StudySession; onE
 }
 
 function ExamCard({ exam }: { exam: Exam }) {
-  return <Link to={`/?exam=${encodeURIComponent(exam.id)}`} className="flex min-w-0 items-start gap-2 rounded-lg border border-violet-200 border-l-[3px] border-l-violet-500 bg-violet-50 p-2.5 text-violet-950 transition hover:bg-violet-100 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-100" title={`Edit exam: ${exam.name}`}>
+  return <Link to={exam.id === 'exam-period-start' ? '/?examPeriod=1' : `/?exam=${encodeURIComponent(exam.id)}`}  className="flex min-w-0 items-start gap-2 rounded-lg border border-violet-200 border-l-[3px] border-l-violet-500 bg-violet-50 p-2.5 text-violet-950 transition hover:bg-violet-100 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-100" title={`Edit exam: ${exam.name}`}>
     <GraduationCap size={15} className="mt-0.5 shrink-0" /><span className="min-w-0"><span className="block text-[9px] font-semibold uppercase tracking-wide opacity-70">Exam · All day</span><span className="mt-1 block break-words text-xs font-semibold">{exam.name}</span></span>
   </Link>;
 }
@@ -37,6 +37,8 @@ export default function Schedule() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { exams } = useExams(user?.id ?? 0);
+  const { startDate: examPeriodStart } = useExamPeriod(user?.id ?? 0);
+  const calendarExams = examPeriodStart ? [...exams, { id: 'exam-period-start', name: 'Exam period starts', date: examPeriodStart }] : exams;
   const [searchParams, setSearchParams] = useSearchParams();
   const loadSequence = useRef(0);
   const [anchor, setAnchor] = useState(() => { const value = searchParams.get('date'); return value && isValid(parseISO(value)) ? parseISO(value) : new Date(); });
@@ -95,7 +97,7 @@ export default function Schedule() {
   };
 
   const periodSessions = view === 'month' ? sessions.filter(session => isSameMonth(parseISO(session.date), anchor)) : sessions;
-  const periodExams = exams.filter(exam => exam.date >= localDateString(start) && exam.date <= localDateString(end) && (view !== 'month' || isSameMonth(parseISO(exam.date), anchor)));
+  const periodExams = calendarExams.filter(exam => exam.date >= localDateString(start) && exam.date <= localDateString(end) && (view !== 'month' || isSameMonth(parseISO(exam.date), anchor)));
   const totalMinutes = periodSessions.reduce((sum, session) => sum + session.duration_minutes, 0);
   const completedMinutes = periodSessions.filter((session) => session.completed).reduce((sum, session) => sum + session.duration_minutes, 0);
 
@@ -118,7 +120,7 @@ export default function Schedule() {
             <div className="grid min-w-[700px] grid-cols-7 border-b border-line bg-sidebar">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <div key={day} className="py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-muted">{day}</div>)}</div>
             <div className="grid min-w-[700px] grid-cols-7">{days.map(day => {
               const date = localDateString(day);
-              const dayExams = exams.filter(exam => exam.date === date);
+              const dayExams = calendarExams.filter(exam => exam.date === date);
               const daySessions = sessions.filter(session => session.date === date).sort((a, b) => a.start_minutes - b.start_minutes);
               return <section key={date} aria-label={format(day, 'EEEE, MMMM d, yyyy')} onDragOver={event => { event.preventDefault(); setDragOver(date); }} onDragLeave={() => setDragOver(null)} onDrop={event => dropSession(event, date)} className={cn('min-h-36 border-b border-r border-line p-2', !isSameMonth(day, anchor) && 'bg-canvas text-muted', dragOver === date && 'bg-accent-soft dark:bg-accent-dark/30')}>
                 <div className="mb-2 flex items-center justify-between"><button onClick={() => openCreate(date)} className={cn('flex h-7 w-7 items-center justify-center rounded-full text-xs hover:ring-1 hover:ring-accent', isSameDay(day, new Date()) && 'bg-accent text-white')} aria-label={`Add session on ${format(day, 'MMMM d, yyyy')}`}>{format(day, 'd')}</button><button className="icon-btn h-6 w-6" onClick={() => openCreate(date)} aria-label={`New session on ${date}`}><Plus size={12} /></button></div>
@@ -133,7 +135,7 @@ export default function Schedule() {
             <div className="grid min-w-[960px] grid-cols-7 divide-x divide-line">
               {days.map((day) => {
                 const date = localDateString(day);
-              const dayExams = exams.filter(exam => exam.date === date);
+              const dayExams = calendarExams.filter(exam => exam.date === date);
                 const daySessions = sessions.filter((session) => session.date === date);
                 const today = isSameDay(day, new Date());
                 return <section key={date} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDragOver(date); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragOver(null); }} onDrop={(event) => dropSession(event, date)} className={cn('flex min-h-[560px] min-w-0 flex-col transition-colors', dragOver === date && 'bg-accent-soft/60 dark:bg-accent-dark/20')}>
@@ -146,9 +148,9 @@ export default function Schedule() {
           </div>
         ) : (
           <div className="mx-auto max-w-4xl p-4 sm:p-7">
-            {days.some(day => sessions.some(session => session.date === localDateString(day)) || exams.some(exam => exam.date === localDateString(day))) ? days.map((day) => {
+            {days.some(day => sessions.some(session => session.date === localDateString(day)) || calendarExams.some(exam => exam.date === localDateString(day))) ? days.map((day) => {
               const date = localDateString(day);
-              const dayExams = exams.filter(exam => exam.date === date);
+              const dayExams = calendarExams.filter(exam => exam.date === date);
               const daySessions = sessions.filter((session) => session.date === date);
               if (!daySessions.length && !dayExams.length) return null;
               return <section key={date} className="mb-7"><div className="mb-3 flex items-center gap-3"><h3 className={cn('text-xs font-semibold', isSameDay(day, new Date()) && 'text-accent')}>{isSameDay(day, new Date()) ? 'Today' : format(day, 'EEEE')} · {format(day, 'MMMM d')}</h3><span className="h-px flex-1 bg-line" /><span className="text-[10px] text-muted">{formatMinutes(daySessions.reduce((sum, session) => sum + session.duration_minutes, 0))}</span></div><div className="space-y-2">{dayExams.map(exam => <ExamCard key={exam.id} exam={exam} />)}{daySessions.map((session) => <div key={session.id} onClick={() => openEdit(session)} className="group flex cursor-pointer gap-4 rounded-xl border border-line bg-surface p-4 transition hover:border-accent/30 hover:shadow-soft"><div className="w-16 shrink-0 text-xs font-medium text-muted">{formatTime(session.start_minutes)}</div><span className={cn('w-1 shrink-0 rounded-full', session.topic === 'review' ? 'bg-amber-500' : session.topic === 'practice' ? 'bg-violet-500' : 'bg-emerald-500')} /><div className="min-w-0 flex-1"><p className={cn('text-sm font-semibold', session.completed && 'line-through opacity-50')}>{session.title}</p>{session.notes && <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted">{session.notes}</p>}<p className="mt-2 text-[10px] capitalize text-muted">{session.topic} · {formatMinutes(session.duration_minutes)}</p></div><button className="icon-btn self-start" onClick={(event) => { event.stopPropagation(); updateSession(session, { completed: !session.completed }); }} aria-label="Toggle completion">{session.completed ? <Check size={17} className="text-accent" /> : <Circle size={17} />}</button></div>)}</div></section>;
