@@ -1,9 +1,9 @@
 import {
-  ArrowRight, BookOpenText, Bot, CalendarPlus, Check, CheckCircle2, ChevronRight,
-  Clock3, FileText, Flame, Library, Plus, Sparkles, Target,
+  BookOpenText, Bot, CalendarPlus, Check, CheckCircle2, ChevronRight,
+  Clock3, FileText, Flame, Library, Sparkles, Target,
 } from 'lucide-react';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import ExamCountdown from '../components/ExamCountdown';
 import SemesterCourses from '../components/SemesterCourses';
@@ -12,7 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { api } from '../lib/api';
 import { cn, formatMinutes, formatTime, friendlyDate, greeting, sessionColors } from '../lib/utils';
-import type { DashboardData, Note, StudySession } from '../types';
+import type { DashboardData, StudySession } from '../types';
 
 function StatCard({ label, value, detail, icon, tone }: { label: string; value: string | number; detail: string; icon: React.ReactNode; tone: string }) {
   return (
@@ -27,10 +27,7 @@ function StatCard({ label, value, detail, icon, tone }: { label: string; value: 
 export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
-  const [quickNote, setQuickNote] = useState('');
-  const [savingNote, setSavingNote] = useState(false);
   const [updating, setUpdating] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -49,20 +46,7 @@ export default function Dashboard() {
     finally { setUpdating(null); }
   };
 
-  const createQuickNote = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!quickNote.trim()) return;
-    setSavingNote(true);
-    try {
-      const firstLine = quickNote.trim().split('\n')[0].slice(0, 70);
-      const note = await api<Note>('/notes', { method: 'POST', body: JSON.stringify({ title: firstLine || 'Quick note', content: quickNote.trim() }) });
-      setQuickNote('');
-      navigate(`/notes?note=${note.id}`);
-    } catch (error) { toast(error instanceof Error ? error.message : 'Could not save note', 'error'); }
-    finally { setSavingNote(false); }
-  };
-
-  if (!data) return <div className="mx-auto max-w-[1440px] p-5 sm:p-8"><Skeleton className="h-10 w-72" /><div className="mt-7 grid grid-cols-2 gap-4 lg:grid-cols-4">{[1, 2, 3, 4].map((item) => <Skeleton key={item} className="h-32" />)}</div><Skeleton className="mt-5 h-96" /></div>;
+  if (!data) return <div className="mx-auto max-w-[1440px] p-5 sm:p-8"><Skeleton className="h-10 w-72" /><div className="mt-7 grid grid-cols-2 gap-4 lg:grid-cols-5">{[1, 2, 3, 4, 5].map((item) => <Skeleton key={item} className="h-32" />)}</div><Skeleton className="mt-5 h-96" /></div>;
 
   const { stats } = data;
   const todayProgress = stats.today_sessions ? Math.round(stats.today_completed / stats.today_sessions * 100) : 0;
@@ -82,11 +66,9 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {user && <ExamCountdown key={user.id} userId={user.id} />}
-      {user && <SemesterCourses key={user.id} userId={user.id} />}
-
-      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         <StatCard label="Focused this week" value={formatMinutes(stats.completed_minutes)} detail={`of ${formatMinutes(stats.planned_minutes)} planned`} icon={<Clock3 size={16} />} tone="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" />
+        {user && <ExamCountdown key={user.id} userId={user.id} />}
         <StatCard label="Today's progress" value={`${stats.today_completed}/${stats.today_sessions}`} detail="study sessions completed" icon={<Target size={16} />} tone="bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" />
         <StatCard label="Study streak" value={`${stats.streak} ${stats.streak === 1 ? 'day' : 'days'}`} detail={stats.streak ? 'Keep the momentum going' : 'Complete a session to begin'} icon={<Flame size={16} />} tone="bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" />
         <StatCard label="Study library" value={stats.documents} detail={`${stats.notes} ${stats.notes === 1 ? 'note' : 'notes'} in your workspace`} icon={<Library size={16} />} tone="bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300" />
@@ -130,10 +112,7 @@ export default function Dashboard() {
         </div>
 
         <aside className="space-y-5 xl:col-span-4">
-          <section className="card p-5">
-            <div className="flex items-center gap-2"><Plus size={16} className="text-accent" /><h3 className="text-sm font-semibold">Capture a thought</h3></div>
-            <form onSubmit={createQuickNote}><textarea className="field mt-3 min-h-24 resize-none border-transparent bg-canvas px-3 text-[13px]" value={quickNote} onChange={(e) => setQuickNote(e.target.value)} placeholder="An idea, a question, something to remember…" maxLength={500000} /><div className="mt-2 flex items-center justify-between"><span className="text-[10px] text-muted">Saved to Notes & docs</span><Button type="submit" variant="ghost" className="h-8 px-2 text-xs" disabled={!quickNote.trim()} loading={savingNote}>Save note<ArrowRight size={14} /></Button></div></form>
-          </section>
+          {user && <SemesterCourses key={user.id} userId={user.id} />}
 
           <section className="card p-5">
             <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold">Coming up</h3><CalendarPlus size={16} className="text-muted" /></div>

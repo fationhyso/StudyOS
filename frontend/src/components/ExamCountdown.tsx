@@ -15,6 +15,7 @@ export default function ExamCountdown({ userId }: { userId: number }) {
   const { toast } = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [managing, setManaging] = useState(false);
   const [name, setName] = useState('');
   const [date, setDate] = useState(localDateString());
   const [today, setToday] = useState(localDateString());
@@ -30,7 +31,7 @@ export default function ExamCountdown({ userId }: { userId: number }) {
     const exam = exams.find(item => item.id === id);
     if (exam && id !== handledExam) { setEditingId(exam.id); setName(exam.name); setDate(exam.date); setEditing(true); setHandledExam(id); }
   }, [searchParams, exams, handledExam]);
-  const openSetup = (exam?: Exam) => { setEditingId(exam?.id ?? null); setName(exam?.name || ''); setDate(exam?.date ?? localDateString()); setEditing(true); };
+  const openSetup = (exam?: Exam) => { setManaging(false); setEditingId(exam?.id ?? null); setName(exam?.name || ''); setDate(exam?.date ?? localDateString()); setEditing(true); };
   const save = (event: FormEvent) => {
     event.preventDefault();
     if (!name.trim() || !isValid(parseISO(date)) || date < localDateString()) { toast('Choose an exam name and a date from today onward', 'error'); return; }
@@ -44,12 +45,18 @@ export default function ExamCountdown({ userId }: { userId: number }) {
     catch { toast('Could not remove your countdown', 'error'); }
   };
   const sortedExams = [...exams].sort((a, b) => Number(a.date < today) - Number(b.date < today) || a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+  const nextExam = sortedExams.find(exam => exam.date >= today);
+  const daysLeft = nextExam ? differenceInCalendarDays(parseISO(nextExam.date), parseISO(today)) : null;
   return <>
-    <section aria-label="Exam countdowns" className="card mb-5 overflow-hidden border-accent/20">
-      <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:px-5">
-        <div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent dark:bg-accent-dark/40"><GraduationCap size={22} /></span><div><h3 className="text-sm font-semibold">Exam countdowns</h3><p className="mt-1 text-xs text-muted">{exams.length ? 'Your upcoming exams, nearest first.' : 'When are your exams? Add your dates to start counting down.'}</p></div></div>
-        <Button variant="secondary" className="h-9 px-3 text-xs" onClick={() => openSetup()} icon={exams.length ? <Plus size={15} /> : <CalendarDays size={15} />}>{exams.length ? 'Add exam' : 'Set up exams'}</Button>
-      </div>
+    <section aria-label="Exam countdowns" className="card min-w-0 p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-2"><h3 className="text-xs font-medium text-muted">Exam countdown</h3><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent dark:bg-accent-dark/40"><GraduationCap size={16} /></span></div>
+      {nextExam ? <>
+        <button className="mt-1 block w-full text-left" title={`Edit ${nextExam.name}`} onClick={() => openSetup(nextExam)}><span className="block text-2xl font-semibold tracking-[-.04em]">{daysLeft === 0 ? 'Today' : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}`}</span><span className="mt-1 block truncate text-[11px] text-muted">{nextExam.name} · {format(parseISO(nextExam.date), 'd MMM')}</span></button>
+        <button className="mt-2 text-[11px] font-medium text-accent hover:underline" onClick={() => setManaging(true)}>Manage exams ({exams.length})</button>
+      </> : <><p className="mt-1 text-sm font-semibold">{exams.length ? 'Set your next date' : 'When are your exams?'}</p><button className="mt-2 text-xs font-medium text-accent hover:underline" onClick={() => exams.length ? setManaging(true) : openSetup()}>{exams.length ? 'Manage exams' : 'Set up exams'}</button></>}
+    </section>
+    {managing && <Modal title="Your exams" description="Upcoming exams appear first." onClose={() => setManaging(false)}>
+      <div className="mb-3 flex justify-end"><Button variant="secondary" className="h-9 px-3 text-xs" onClick={() => openSetup()} icon={<Plus size={15} />}>Add exam</Button></div>
       {sortedExams.length > 0 && <div className="max-h-80 divide-y divide-line overflow-y-auto border-t border-line">{sortedExams.map(exam => {
         const days = differenceInCalendarDays(parseISO(exam.date), parseISO(today));
         return <div key={exam.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
@@ -59,7 +66,7 @@ export default function ExamCountdown({ userId }: { userId: number }) {
           <button className="icon-btn h-8 w-8" title={`Edit ${exam.name}`} aria-label={`Edit ${exam.name}`} onClick={() => openSetup(exam)}><Pencil size={14} /></button>
         </div>;
       })}</div>}
-    </section>
+    </Modal>}
     {editing && <Modal title={editingId ? 'Edit exam countdown' : 'Add an exam'} description="Add the exam you’re working toward." onClose={() => setEditing(false)}>
       <form onSubmit={save} className="space-y-4">
         <div><label className="label" htmlFor="exam-name">Exam name</label><input id="exam-name" autoFocus className="field" placeholder="e.g. Biology final" value={name} onChange={event => setName(event.target.value)} required maxLength={120} /></div>
