@@ -170,7 +170,7 @@ npm run build
 
 ## Verification and current limits
 
-The production React build and thirty-six backend tests and eight frontend tests pass. Tests cover signup/login, notes, private document access, indexing and cited retrieval, schedule generation, invalid AI schedule fallback, disabling registration, agent key permissions/expiry/revocation, helper uploads/scheduling, subject folder lifecycle/privacy, and existing database upgrades. Browser checks covered PDF selection and saved highlights, nested folder navigation, the month calendar, and both notes/sidebar collapse controls. Docker image execution requires Docker Engine or Docker Desktop and was not verified in the development environment.
+The production React build and forty-two backend tests and ten frontend tests pass. Tests cover signup/login, notes, private document access, indexing and cited retrieval, schedule generation, invalid AI schedule fallback, disabling registration, agent key permissions/expiry/revocation, helper uploads/scheduling, subject folder lifecycle/privacy, and existing database upgrades. Browser checks covered PDF selection and saved highlights, nested folder navigation, the month calendar, and both notes/sidebar collapse controls. Docker image execution requires Docker Engine or Docker Desktop and was not verified in the development environment.
 
 - PDF text highlights are saved to the workspace database, remain aligned through zoom/rotation, and can be revisited or removed in the highlights panel. Freehand drawing and embedding annotations into downloaded PDF files are not implemented.
 - PDF extraction reads embedded text. Scanned PDFs need OCR before upload; image uploads use Tesseract OCR.
@@ -233,3 +233,12 @@ $$
 ```
 
 LaTeX math is rendered locally with KaTeX in notes, the tutor, and Markdown file previews; no external rendering service is used. Raw HTML is not enabled, and unsafe KaTeX extensions are disabled. The download button exports the current Markdown draft as `.md` (including its LaTeX source). Persistent notes remain in SQLite and are included in the existing data-volume backup. Authenticated API clients can export saved notes at `/api/notes/{id}/file`. Agent note creation requires both `ai` and `notes` permissions.
+
+
+## Calendar sessions from the tutor
+
+Choose **Create session**, use `/session`, or send an explicit request such as “Schedule biology tomorrow at 18:00 for 45 minutes.” Dates use your browser's local date and timezone. The optional date/time/minutes fields override details in your message. The tutor writes one real calendar session, returns its saved details, and provides **Open calendar** to open that session for editing. Missing/ambiguous details or a conflicting session produce a clarification rather than an unexpected calendar entry. For a whole study plan, use Schedule → Generate plan. With no provider key, the tutor can parse simple today/tomorrow/ISO-date requests with 24-hour or am/pm times; complete structured details always work without AI. These are calendar entries, not timed Telegram notifications.
+
+Files & resources opens a full responsive grid of root folders, with no capped inner scrolling list. The cross-folder All files view has been removed; documents appear in their subject folder or Unfiled. Root uploads go to Unfiled. Very large folder collections can still require ordinary page scrolling.
+
+PDF highlighting has **Undo last highlight**, also available with **⌘/Ctrl+Z** while focus is inside the viewer (outside text inputs). It removes the most recently saved highlight action from the current viewer session, including all its pages. Search fields retain their normal text undo. Double-click a note's rendered preview to enter edit mode; links retain their normal behavior. Preview remains the default on opening a note.

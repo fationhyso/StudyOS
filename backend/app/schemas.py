@@ -220,14 +220,31 @@ class SourceOut(BaseModel):
     snippet: str
 
 
+class CalendarDetails(BaseModel):
+    date: Date | None = None
+    start_time: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    duration_minutes: int | None = Field(default=None, ge=5, le=480)
+
+
 class ChatRequest(BaseModel):
+    create_session: bool = False
+    session_details: CalendarDetails | None = None
+    reference_date: Date | None = None
+    timezone: str = Field(default="local time", max_length=80)
     create_note: bool = False
     message: str = Field(min_length=1, max_length=12_000)
     conversation_id: int | None = None
     document_ids: list[int] = Field(default_factory=list, max_length=20)
 
+    @model_validator(mode="after")
+    def one_action(self):
+        if self.create_note and self.create_session:
+            raise ValueError("Choose either note creation or calendar creation")
+        return self
+
 
 class ChatResponse(BaseModel):
+    calendar_session: StudySessionOut | None = None
     message_id: int
     note: NoteOut | None = None
     conversation_id: int
@@ -246,6 +263,7 @@ class ConversationOut(BaseModel):
 
 
 class MessageOut(BaseModel):
+    calendar_session: StudySessionOut | None = None
     note_id: int | None = None
     model_config = ConfigDict(from_attributes=True)
 

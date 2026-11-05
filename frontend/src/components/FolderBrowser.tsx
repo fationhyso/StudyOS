@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { SubjectFolder } from '../types';
 import { cn } from '../lib/utils';
 
-export type FolderSelection = number | 'all' | 'unfiled';
+export type FolderSelection = number | 'root' | 'unfiled';
 export function folderTrail(folders: SubjectFolder[], id: number | null): SubjectFolder[] {
   const byId = new Map(folders.map(folder => [folder.id, folder]));
   const trail: SubjectFolder[] = [];
@@ -29,9 +29,9 @@ export function descendantIds(folders: SubjectFolder[], id: number): Set<number>
   return result;
 }
 
-export function FolderTree({ folders, selected, onSelect, showAll = true, rootLabel = 'Unfiled', excluded = new Set<number>() }: {
+export function FolderTree({ folders, selected, onSelect, showRoot = true, rootLabel = 'Unfiled', excluded = new Set<number>() }: {
   folders: SubjectFolder[]; selected: FolderSelection; onSelect: (value: FolderSelection) => void;
-  showAll?: boolean; rootLabel?: string; excluded?: Set<number>;
+  showRoot?: boolean; rootLabel?: string; excluded?: Set<number>;
 }) {
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
@@ -62,7 +62,7 @@ export function FolderTree({ folders, selected, onSelect, showAll = true, rootLa
   return <div className="flex min-h-0 flex-1 flex-col">
     <div className="relative m-3"><Search size={14} className="absolute left-3 top-3 text-muted" /><input aria-label="Find a folder" className="field h-10 pl-8 pr-8 text-xs" placeholder="Find a folder…" value={query} onChange={event => setQuery(event.target.value)} />{query && <button className="icon-btn absolute right-1 top-1 h-8 w-7" aria-label="Clear folder search" onClick={() => setQuery('')}><X size={13} /></button>}</div>
     <nav aria-label="Folder navigation" className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-      {showAll && <button className={cn('mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium', selected === 'all' ? 'bg-accent-soft text-accent-dark dark:bg-accent-dark dark:text-white' : 'text-muted hover:bg-canvas')} onClick={() => onSelect('all')}><FolderOpen size={15} />All files</button>}
+      {showRoot && <button className={cn('mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium', selected === 'root' ? 'bg-accent-soft text-accent-dark dark:bg-accent-dark dark:text-white' : 'text-muted hover:bg-canvas')} onClick={() => onSelect('root')}><FolderOpen size={15} />Folders</button>}
       <button className={cn('mb-2 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium', selected === 'unfiled' ? 'bg-accent-soft text-accent-dark dark:bg-accent-dark dark:text-white' : 'text-muted hover:bg-canvas')} onClick={() => onSelect('unfiled')}><Folder size={15} />{rootLabel}</button>
       {rows.map(({ folder, depth }) => <div key={folder.id} className={cn('mb-0.5 flex items-center rounded-lg', selected === folder.id ? 'bg-accent-soft text-accent-dark dark:bg-accent-dark dark:text-white' : 'text-muted hover:bg-canvas')} style={{ paddingLeft: Math.min(depth, 12) * 14 }}>
         <button className="icon-btn h-8 w-7" disabled={!children.has(folder.id) || !!query} aria-label={`${expanded.has(folder.id) ? 'Collapse' : 'Expand'} ${folder.name}`} aria-expanded={expanded.has(folder.id)} onClick={() => setExpanded(current => { const next = new Set(current); if (next.has(folder.id)) next.delete(folder.id); else next.add(folder.id); return next; })}>{children.has(folder.id) ? expanded.has(folder.id) ? <ChevronDown size={13} /> : <ChevronRight size={13} /> : <span className="h-1 w-1 rounded-full bg-muted/40" />}</button>

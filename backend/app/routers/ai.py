@@ -6,10 +6,11 @@ from sqlalchemy.exc import IntegrityError
 from ..config import get_settings
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import ChatMessage, Conversation, Document, Note, User, utcnow
+from ..models import ChatMessage, Conversation, Document, Note, StudySession, User, utcnow
 from ..rate_limit import enforce_rate_limit
-from ..schemas import ChatRequest, ChatResponse, ConversationOut, MessageOut, NoteOut
+from ..schemas import ChatRequest, ChatResponse, ConversationOut, MessageOut, NoteOut, StudySessionOut
 from ..services.ai import answer_question
+from ..services.calendar import prepare_session
 from ..services.study_notes import build_note, generate_study_note, note_title, with_sources
 
 router = APIRouter(prefix="/api/ai", tags=["AI tutor"])
@@ -79,6 +80,10 @@ async def chat(
 ) -> ChatResponse:
     if payload.create_note:
         require_note_permission(request)
+    if payload.create_session:
+        key = getattr(request.state, "agent_key", None)
+        if key is not None and "schedule" not in key.scopes:
+            raise HTTPException(403, "Creating calendar sessions requires both ai and schedule permissions")
     enforce_rate_limit(f"ai-chat:{user.id}", limit=30, window_seconds=60)
     if payload.document_ids:
         count = len(db.scalars(
@@ -106,7 +111,11 @@ async def chat(
     db.commit()
 
     title = None
-    if payload.create_note:
+    session_values = None
+    if payload.create_session:
+        session_values, answer, mode = await prepare_session(db, user.id, payload, history)
+        sources = []
+    elif payload.create_note:
         title, answer, sources, mode = await generate_study_note(db, user.id, payload.message, history, payload.document_ids)
     else:
         answer, sources, mode = await answer_question(db, user.id, payload.message, history, payload.document_ids)
@@ -115,8 +124,12 @@ async def chat(
     db.add(assistant)
     db.flush()
     note = build_note(db, user.id, title, with_sources(answer, sources), assistant.id) if title else None
+    calendar_session = StudySession(user_id=user.id, source="tutor", source_message_id=assistant.id, **session_values.model_dump()) if session_values else None
+    if calendar_session is not None:
+        db.add(calendar_session)
     db.commit()
-    return ChatResponse(conversation_id=conversation.id, message_id=assistant.id, answer=answer, sources=sources,
+    return ChatResponse(calendar_session=StudySessionOut.model_validate(calendar_session) if calendar_session else None,
+                        conversation_id=conversation.id, message_id=assistant.id, answer=answer, sources=sources,
                         mode=mode, note=NoteOut.model_validate(note) if note else None)
 
 

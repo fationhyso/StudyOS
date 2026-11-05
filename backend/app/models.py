@@ -92,6 +92,9 @@ class Note(Base):
 class StudySession(Base):
     __tablename__ = "study_sessions"
 
+    source_message_id: Mapped[int | None] = mapped_column(ForeignKey("chat_messages.id", ondelete="SET NULL"), nullable=True, unique=True)
+    source_message: Mapped["ChatMessage | None"] = relationship(back_populates="saved_session")
+
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id", ondelete="SET NULL"), nullable=True)
@@ -125,6 +128,12 @@ class Conversation(Base):
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
+
+    saved_session: Mapped["StudySession | None"] = relationship(back_populates="source_message", uselist=False, passive_deletes=True)
+
+    @property
+    def calendar_session(self) -> "StudySession | None":
+        return self.saved_session
 
     saved_note: Mapped["Note | None"] = relationship(back_populates="source_message", uselist=False, passive_deletes=True)
 

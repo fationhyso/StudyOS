@@ -21,3 +21,10 @@ def upgrade_ai_notes(engine: Engine) -> None:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE notes ADD COLUMN source_message_id INTEGER REFERENCES chat_messages(id) ON DELETE SET NULL"))
             connection.execute(text("CREATE UNIQUE INDEX ix_notes_source_message_id ON notes (source_message_id)"))
+
+
+def upgrade_tutor_sessions(engine: Engine) -> None:
+    if "source_message_id" not in {column["name"] for column in inspect(engine).get_columns("study_sessions")}:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE study_sessions ADD COLUMN source_message_id INTEGER REFERENCES chat_messages(id) ON DELETE SET NULL"))
+            connection.execute(text("CREATE UNIQUE INDEX ix_sessions_source_message_id ON study_sessions (source_message_id)"))

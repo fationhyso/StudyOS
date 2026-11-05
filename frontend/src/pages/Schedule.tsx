@@ -3,7 +3,7 @@ import {
   GripVertical, LayoutGrid, List, Plus, Sparkles,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { addDays, addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, parseISO, startOfMonth, startOfWeek } from 'date-fns';
+import { addDays, addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isValid, isSameDay, isSameMonth, parseISO, startOfMonth, startOfWeek } from 'date-fns';
 import { useSearchParams } from 'react-router-dom';
 import ScheduleGenerator from '../components/ScheduleGenerator';
 import SessionModal from '../components/SessionModal';
@@ -29,7 +29,8 @@ export default function Schedule() {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const loadSequence = useRef(0);
-  const [anchor, setAnchor] = useState(new Date());
+  const [anchor, setAnchor] = useState(() => { const value = searchParams.get('date'); return value && isValid(parseISO(value)) ? parseISO(value) : new Date(); });
+  const handledSession = useRef<number | null>(null);
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +60,12 @@ export default function Schedule() {
 
   const openCreate = (date?: string) => { setEditing(null); setInitialDate(date || localDateString(anchor)); setModalOpen(true); };
   const openEdit = (session: StudySession) => { setEditing(session); setInitialDate(undefined); setModalOpen(true); };
+  useEffect(() => {
+    const id = Number(searchParams.get('session'));
+    if (!id || loading || handledSession.current === id) return;
+    const session = sessions.find(item => item.id === id);
+    if (session) { handledSession.current = id; openEdit(session); }
+  }, [sessions, loading, searchParams]);
   const closeGenerator = () => { setGeneratorOpen(false); if (searchParams.has('generate')) setSearchParams({}); };
 
   const updateSession = async (session: StudySession, changes: object, message?: string) => {

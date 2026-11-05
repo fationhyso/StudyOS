@@ -111,9 +111,11 @@ export interface ChatMessage {
   created_at: string;
   pending?: boolean;
   note_id?: number | null;
+  calendar_session?: StudySession | null;
 }
 
 export interface ChatResponse {
+  calendar_session: StudySession | null;
   message_id: number;
   note: Note | null;
   conversation_id: number;

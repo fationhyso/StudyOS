@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Download, Maximize2, Minus, Plus, RotateCw, Search, X, Highlighter, Trash2, BookMarked } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Maximize2, Minus, Plus, RotateCw, Search, X, Highlighter, Trash2, BookMarked, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -57,6 +57,8 @@ export default function PdfViewer({ blob, documentId, filename, pageTexts }: {
   const [highlights, setHighlights] = useState<PdfHighlight[]>([]);
   const [draft, setDraft] = useState<HighlightDraft[]>([]);
   const [savingHighlight, setSavingHighlight] = useState(false);
+  const [undoStack, setUndoStack] = useState<number[][]>([]);
+  const [undoing, setUndoing] = useState(false);
   const [showHighlights, setShowHighlights] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -66,20 +68,37 @@ export default function PdfViewer({ blob, documentId, filename, pageTexts }: {
   const saveHighlight = async () => {
     setSavingHighlight(true);
     const pending = [...draft];
+    const savedIds: number[] = [];
     try {
       // Save sequentially so a failed multi-page selection can retry only unsaved pages.
       while (pending.length) {
         const item = await api<PdfHighlight>(`/documents/${documentId}/highlights`, { method: 'POST', body: JSON.stringify(pending[0]) });
-        setHighlights(current => [...current, item]); pending.shift(); setDraft([...pending]);
+        setHighlights(current => [...current, item]); savedIds.push(item.id); pending.shift(); setDraft([...pending]);
       }
       window.getSelection()?.removeAllRanges(); toast('Highlight saved');
     } catch (error) { toast(error instanceof Error ? error.message : 'Could not save highlight', 'error'); }
-    finally { setSavingHighlight(false); }
+    finally { if (savedIds.length) setUndoStack(current => [...current, savedIds]); setSavingHighlight(false); }
   };
   const removeHighlight = async (id: number) => {
-    try { await api(`/documents/${documentId}/highlights/${id}`, { method: 'DELETE' }); setHighlights(current => current.filter(item => item.id !== id)); }
+    try { await api(`/documents/${documentId}/highlights/${id}`, { method: 'DELETE' }); setHighlights(current => current.filter(item => item.id !== id)); setUndoStack(current => current.map(group => group.filter(value => value !== id)).filter(group => group.length)); }
     catch (error) { toast(error instanceof Error ? error.message : 'Could not remove highlight', 'error'); }
   };
+  const undoHighlight = useCallback(async () => {
+    if (!undoStack.length || savingHighlight || undoing) return;
+    const remaining = [...undoStack[undoStack.length - 1]];
+    setUndoing(true);
+    try {
+      while (remaining.length) {
+        const id = remaining[remaining.length - 1];
+        await api(`/documents/${documentId}/highlights/${id}`, { method: 'DELETE' });
+        setHighlights(current => current.filter(item => item.id !== id));
+        remaining.pop();
+        setUndoStack(current => [...current.slice(0, -1), ...(remaining.length ? [[...remaining]] : [])]);
+      }
+      toast('Last highlight undone');
+    } catch (error) { toast(error instanceof Error ? error.message : 'Could not undo highlight', 'error'); }
+    finally { setUndoing(false); }
+  }, [undoStack, savingHighlight, undoing, documentId, toast]);
   const [url, setUrl] = useState<string | null>(null);
   const [pages, setPages] = useState(0);
   const [page, setPage] = useState(1);
@@ -112,6 +131,18 @@ export default function PdfViewer({ blob, documentId, filename, pageTexts }: {
     });
   };
   const searchInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onUndo = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest('input, textarea, [contenteditable="true"]')) return;
+      if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z' && undoStack.length) {
+        event.preventDefault(); void undoHighlight();
+      }
+    };
+    const element = container.current;
+    element?.addEventListener('keydown', onUndo);
+    return () => element?.removeEventListener('keydown', onUndo);
+  }, [undoHighlight, undoStack.length]);
   useEffect(() => {
     const selected = () => {
       if (viewport.current && !savingHighlight) setDraft(captureHighlights(viewport.current, rotation));
@@ -185,7 +216,8 @@ export default function PdfViewer({ blob, documentId, filename, pageTexts }: {
         <div className="flex items-center rounded-lg border border-line p-0.5"><button className="icon-btn h-7 w-7" disabled={page <= 1} onClick={() => goToPage(Math.max(1, page - 1))} aria-label="Previous page"><ChevronLeft size={15} /></button><div className="flex items-center gap-1 px-1 text-[11px] text-muted"><input className="w-7 rounded bg-canvas py-0.5 text-center text-ink outline-none" value={page} onChange={(e) => { const value = Number(e.target.value); if (value >= 1 && value <= pages) goToPage(value); }} aria-label="Current page" /><span>/ {pages || '—'}</span></div><button className="icon-btn h-7 w-7" disabled={!pages || page >= pages} onClick={() => goToPage(Math.min(pages, page + 1))} aria-label="Next page"><ChevronRight size={15} /></button></div>
         <span className="mx-1 hidden h-5 w-px bg-line md:block" />
         <div className="flex items-center rounded-lg border border-line p-0.5"><button className="icon-btn h-7 w-7" disabled={scale <= 0.5} onClick={() => setScale((value) => Math.max(0.5, value - 0.15))} aria-label="Zoom out"><Minus size={14} /></button><button className="h-7 min-w-12 px-1 text-[10px] font-medium text-muted hover:text-ink" onClick={() => setScale(1)} title="Reset zoom">{Math.round(scale * 100)}%</button><button className="icon-btn h-7 w-7" disabled={scale >= 2.5} onClick={() => setScale((value) => Math.min(2.5, value + 0.15))} aria-label="Zoom in"><Plus size={14} /></button></div>
-        <button className={`icon-btn ${draft.length ? 'bg-yellow-100 text-amber-700 dark:bg-yellow-950 dark:text-yellow-200' : ''}`} disabled={!draft.length || savingHighlight} onMouseDown={event => event.preventDefault()} onClick={saveHighlight} aria-label="Save selected text as highlight" title="Select text, then save highlight">{savingHighlight ? <Spinner /> : <Highlighter size={16} />}</button>
+        <button className={`icon-btn ${draft.length ? 'bg-yellow-100 text-amber-700 dark:bg-yellow-950 dark:text-yellow-200' : ''}`} disabled={!draft.length || savingHighlight || undoing} onMouseDown={event => event.preventDefault()} onClick={saveHighlight} aria-label="Save selected text as highlight" title="Select text, then save highlight">{savingHighlight ? <Spinner /> : <Highlighter size={16} />}</button>
+        <button className="icon-btn" disabled={!undoStack.length || savingHighlight || undoing} onClick={undoHighlight} title="Undo last highlight (⌘/Ctrl+Z)" aria-label="Undo last highlight" aria-keyshortcuts="Control+z Meta+z">{undoing ? <Spinner /> : <Undo2 size={16} />}</button>
         <button className="icon-btn" onClick={() => setShowHighlights(value => !value)} aria-label="Show saved highlights" aria-pressed={showHighlights} title={`${highlights.length} saved highlights`}><BookMarked size={16} /></button>
         <button className="icon-btn hidden sm:inline-flex" onClick={() => setRotation((value) => (value + 90) % 360)} aria-label="Rotate page"><RotateCw size={16} /></button>
         <button className="icon-btn" onClick={() => downloadDocument(documentId, filename)} aria-label="Download document"><Download size={16} /></button>
@@ -201,7 +233,7 @@ export default function PdfViewer({ blob, documentId, filename, pageTexts }: {
           </Document>}
         </div>
       </div>
-      {showHighlights && <aside className="flex w-56 shrink-0 flex-col overflow-y-auto border-l border-line bg-surface p-3 max-sm:w-40"><div className="mb-3 flex items-center justify-between"><h3 className="text-xs font-semibold">Highlights ({highlights.length})</h3><button className="icon-btn h-6 w-6" aria-label="Close highlights" onClick={() => setShowHighlights(false)}><X size={13} /></button></div>{highlights.length ? [...highlights].sort((a, b) => a.page - b.page).map(item => <div key={item.id} className="mb-2 rounded-lg border border-line p-2"><button className="w-full text-left" onClick={() => goToPage(item.page)}><span className="text-[10px] font-semibold text-accent">Page {item.page}</span><span className="mt-1 block line-clamp-3 text-xs text-muted">{item.text}</span></button><button className="icon-btn mt-1 h-6 w-6 hover:text-red-500" aria-label={`Remove highlight on page ${item.page}`} onClick={() => removeHighlight(item.id)}><Trash2 size={12} /></button></div>) : <p className="text-xs leading-5 text-muted">Select text in a page, then choose Save highlight.</p>}</aside>}
+      {showHighlights && <aside className="flex w-56 shrink-0 flex-col overflow-y-auto border-l border-line bg-surface p-3 max-sm:w-40"><div className="mb-3 flex items-center justify-between"><h3 className="text-xs font-semibold">Highlights ({highlights.length})</h3><button className="icon-btn h-6 w-6" aria-label="Close highlights" onClick={() => setShowHighlights(false)}><X size={13} /></button></div>{highlights.length ? [...highlights].sort((a, b) => a.page - b.page).map(item => <div key={item.id} className="mb-2 rounded-lg border border-line p-2"><button className="w-full text-left" onClick={() => goToPage(item.page)}><span className="text-[10px] font-semibold text-accent">Page {item.page}</span><span className="mt-1 block line-clamp-3 text-xs text-muted">{item.text}</span></button><button className="icon-btn mt-1 h-6 w-6 hover:text-red-500" disabled={undoing || savingHighlight} aria-label={`Remove highlight on page ${item.page}`} onClick={() => removeHighlight(item.id)}><Trash2 size={12} /></button></div>) : <p className="text-xs leading-5 text-muted">Select text in a page, then choose Save highlight.</p>}</aside>}
       </div>
       <div className="flex h-7 shrink-0 items-center justify-between border-t border-line bg-surface px-4 text-[9px] text-muted"><span>{filename}</span><span className="hidden sm:inline">Scroll through pages · Ctrl / ⌘ + F to search</span></div>
     </div>

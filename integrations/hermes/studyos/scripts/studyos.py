@@ -85,7 +85,7 @@ def main():
     p.add_argument('id', type=int)
     p = commands.add_parser('complete')
     p.add_argument('id', type=int)
-    for name in ['generate', 'ask', 'create-note']:
+    for name in ['generate', 'ask', 'create-note', 'create-session']:
         p = commands.add_parser(name)
         p.add_argument('--json-file', required=True, help='JSON request body file')
     args = parser.parse_args()
@@ -123,6 +123,8 @@ def main():
         payload = json.loads(Path(args.json_file).read_text())
         if args.command == 'create-note':
             payload['create_note'] = True
+        elif args.command == 'create-session':
+            payload['create_session'] = True
         result = request('POST', '/schedule/generate' if args.command == 'generate' else '/ai/chat', payload)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

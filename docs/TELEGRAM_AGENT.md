@@ -119,7 +119,7 @@ Hermes references: [skill format and environment passthrough](https://hermes-age
 
 ## Subject folders (Notability-style organization)
 
-In **Files & resources**, choose **New folder**, enter a subject such as Biology, and select that folder. New uploads go into the selected folder. Each file has a folder selector for moving it. All files shows the whole library; Unfiled shows files with no subject. The folder browser provides search and expansion controls. The current folder shows its subfolders and Edit/Delete controls. Deleting a folder **keeps its direct files in Unfiled**; it does not delete documents or their indexes. Folders can contain subfolders. Use the searchable folder tree and breadcrumbs to navigate; Edit folder changes its parent. Deleting a folder moves its child folders up one level and preserves their contents.
+In **Files & resources**, choose **New folder**, enter a subject such as Biology, and select that folder. New uploads go into the selected folder. Each file has a folder selector for moving it. The Folders landing page shows root folders; Unfiled shows files with no subject. The aggregate All files UI has been removed, while the API can still list documents across folders. The folder browser provides search and expansion controls. The current folder shows its subfolders and Edit/Delete controls. Deleting a folder **keeps its direct files in Unfiled**; it does not delete documents or their indexes. Folders can contain subfolders. Use the searchable folder tree and breadcrumbs to navigate; Edit folder changes its parent. Deleting a folder moves its child folders up one level and preserves their contents.
 
 Your existing `documents` agent permission includes folders. Update the installed Hermes skill/helper by copying the latest `integrations/hermes/studyos` directory to the agent machine again. Then say:
 
@@ -151,3 +151,8 @@ Nested folder examples: create with `{"name":"Semester 1","parent_id":3}`; move 
 ## Ask the tutor to create notes
 
 With an agent key containing both **AI** and **Notes** permissions, send `POST /api/ai/chat` with `{"message":"Create energy revision notes with LaTeX equations","document_ids":[7],"create_note":true}`. The response includes `message_id` and `note` (with its ID, title, and Markdown content). The note is saved in Notes & docs. The updated Hermes helper provides `create-note --json-file /path/request.json`. To save an existing tutor answer, call `POST /api/ai/messages/{message_id}/note`; repeated calls return the same saved note. Download the actual `.md` representation at `GET /api/notes/{note_id}/file` with Notes permission. Your separate Hermes model does not need to generate the file itself.
+
+
+## Create one calendar session through the tutor
+
+With `ai` and `schedule` permissions, call `POST /api/ai/chat` with `{"message":"Schedule biology tomorrow at 18:00 for 45 minutes","create_session":true,"reference_date":"2026-11-05","timezone":"Europe/Athens"}`. Use the actual local reference date, not this example date. Optional `session_details` is `{"date":"2026-11-06","start_time":"18:00","duration_minutes":45}` and overrides text. The response's `calendar_session` is non-null only if creation succeeded. Otherwise relay the clarification. History preserves the session link. Existing direct `/api/schedule` endpoints still work. The Hermes helper also supports `create-session --json-file /path/request.json`. Calendar entries survive chat deletion; the app does not send timed reminders.

@@ -10,7 +10,7 @@ from sqlalchemy import select, text
 from .config import get_settings
 from .database import Base, SessionLocal, engine
 from .models import Document
-from .migrations import upgrade_subject_folders, upgrade_ai_notes
+from .migrations import upgrade_subject_folders, upgrade_ai_notes, upgrade_tutor_sessions
 from .routers import ai, auth, dashboard, documents, notes, schedule, integrations, folders
 from .services.documents import process_document
 
@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     upgrade_subject_folders(engine)
     upgrade_ai_notes(engine)
+    upgrade_tutor_sessions(engine)
     threading.Thread(target=recover_interrupted_documents, name="studyos-index-recovery", daemon=True).start()
     yield
 
