@@ -45,7 +45,11 @@ export default function Files() {
   const libraryUrl = activeFolder === 'root' ? '/files' : `/files?folder=${activeFolder}`;
   const [folderPanelOpen, setFolderPanelOpen] = useState(false);
   const [folderParent, setFolderParent] = useState<number | null>(null);
-  const [moveTarget, setMoveTarget] = useState<StudyDocument | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [moveIds, setMoveIds] = useState<number[]>([]);
+  const [moveBusy, setMoveBusy] = useState(false);
+  const [newDestinationName, setNewDestinationName] = useState('');
+  const [createDestination, setCreateDestination] = useState(false);
   const [moveDestination, setMoveDestination] = useState<number | null>(null);
   const [folderDialog, setFolderDialog] = useState<SubjectFolder | 'new' | null>(null);
   const [folderName, setFolderName] = useState('');
@@ -70,6 +74,10 @@ export default function Files() {
   }, [toast]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setSelectedIds(new Set()); }, [activeFolder, query, filter]);
+  useEffect(() => {
+    setSelectedIds(current => new Set([...current].filter(id => documents.some(doc => doc.id === id))));
+  }, [documents]);
   useEffect(() => {
     if (!documents.some((doc) => doc.status === 'processing')) return;
     const interval = window.setInterval(() => load(true), 2500);
@@ -126,7 +134,7 @@ export default function Files() {
         method: folderDialog === 'new' ? 'POST' : 'PATCH', body: JSON.stringify({ name: folderName.trim(), parent_id: folderParent }),
       });
       await load(); setActiveFolder(folder.id); setFolderDialog(null);
-      toast(folderDialog === 'new' ? 'Subject subject created' : 'Subject renamed');
+      toast(folderDialog === 'new' ? 'Subject created' : 'Subject renamed');
     } catch (error) { toast(error instanceof Error ? error.message : 'Could not save subject', 'error'); }
     finally { setFolderBusy(false); }
   };
@@ -139,14 +147,43 @@ export default function Files() {
     } catch (error) { toast(error instanceof Error ? error.message : 'Could not delete subject', 'error'); }
     finally { setFolderBusy(false); }
   };
-  const moveFile = async (document: StudyDocument, destination: string) => {
-    try {
-      const updated = await api<StudyDocument>(`/documents/${document.id}`, { method: 'PATCH', body: JSON.stringify({ folder_id: destination ? Number(destination) : null }) });
-      setDocuments(current => current.map(item => item.id === updated.id ? updated : item));
-      toast('File moved'); return true;
-    } catch (error) { toast(error instanceof Error ? error.message : 'Could not move file', 'error'); return false; }
+  const openMove = (ids: number[], destination: number | null) => {
+    setMoveIds(ids); setMoveDestination(destination); setCreateDestination(false); setNewDestinationName('');
   };
-  const folderPicker = (document: StudyDocument) => <button className={cn('flex max-w-full items-center gap-1.5 rounded-lg px-1 text-left text-[11px] text-muted hover:bg-canvas hover:text-accent', layout === 'list' ? 'mt-0.5 py-0.5' : 'mt-3 py-1')} onClick={event => { event.stopPropagation(); setMoveTarget(document); setMoveDestination(document.folder_id); }} aria-label={`Move ${document.name} to subject`}><Move size={12} className="shrink-0" /><FolderDot id={document.folder_id} /><span className="truncate">{document.folder_id ? folderTrail(folders, document.folder_id).map(folder => folder.name).join(' / ') || 'Subject' : 'Unfiled'}</span></button>;
+  const toggleSelection = (id: number) => setSelectedIds(current => {
+    const next = new Set(current);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const selectionCheckbox = (doc: StudyDocument) => <input type="checkbox" className="h-4 w-4 shrink-0 cursor-pointer accent-accent" aria-label={`Select ${doc.name}`} checked={selectedIds.has(doc.id)} onClick={event => event.stopPropagation()} onChange={() => toggleSelection(doc.id)} />;
+  const moveFiles = async () => {
+    if (moveBusy || !moveIds.length || (createDestination && !newDestinationName.trim())) return;
+    setMoveBusy(true);
+    try {
+      let destination = moveDestination;
+      if (createDestination) {
+        const folder = await api<SubjectFolder>('/folders', { method: 'POST', body: JSON.stringify({ name: newDestinationName.trim(), parent_id: destination }) });
+        setFolders(current => [...current, folder]);
+        destination = folder.id;
+        // Keep the created destination for retries if some files cannot move.
+        setMoveDestination(destination); setCreateDestination(false); setNewDestinationName('');
+      }
+      const results = await Promise.allSettled(moveIds.map(id => api<StudyDocument>(`/documents/${id}`, { method: 'PATCH', body: JSON.stringify({ folder_id: destination }) })));
+      const updated = new Map<number, StudyDocument>();
+      const failed: number[] = [];
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') updated.set(result.value.id, result.value);
+        else failed.push(moveIds[index]);
+      });
+      setDocuments(current => current.map(doc => updated.get(doc.id) ?? doc));
+      setSelectedIds(current => new Set([...current].filter(id => !updated.has(id))));
+      setMoveIds(failed);
+      if (updated.size) toast(`${updated.size} ${updated.size === 1 ? 'file moved' : 'files moved'}`);
+      if (failed.length) toast(`${failed.length} ${failed.length === 1 ? 'file could' : 'files could'} not be moved. Retry the remaining files.`, 'error');
+    } catch (error) { toast(error instanceof Error ? error.message : 'Could not create destination', 'error'); }
+    finally { setMoveBusy(false); }
+  };
+  const folderPicker = (document: StudyDocument) => <button className={cn('flex max-w-full items-center gap-1.5 rounded-lg px-1 text-left text-[11px] text-muted hover:bg-canvas hover:text-accent', layout === 'list' ? 'mt-0.5 py-0.5' : 'mt-3 py-1')} onClick={event => { event.stopPropagation(); openMove([document.id], document.folder_id); }} aria-label={`Move ${document.name} to subject`}><Move size={12} className="shrink-0" /><FolderDot id={document.folder_id} /><span className="truncate">{document.folder_id ? folderTrail(folders, document.folder_id).map(folder => folder.name).join(' / ') || 'Subject' : 'Unfiled'}</span></button>;
 
 
   const selected = documents.find((doc) => doc.id === Number(documentId));
@@ -158,6 +195,22 @@ export default function Files() {
     const matchesFolder = activeFolder === 'unfiled' ? doc.folder_id === null : typeof activeFolder === 'number' && doc.folder_id === activeFolder;
     return matchesQuery && matchesFilter && matchesFolder;
   });
+  const visibleSubjects = activeFolder === 'unfiled' ? [] : childFolders.filter(folder => folder.name.toLowerCase().includes(query.toLowerCase()));
+  const entries = [
+    ...visibleSubjects.map(folder => ({ kind: 'subject' as const, name: folder.name, folder })),
+    ...filtered.map(document => ({ kind: 'document' as const, name: document.name, document })),
+  ].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+  const subjectItem = (folder: SubjectFolder) => {
+    const details = `${folders.filter(item => item.parent_id === folder.id).length} subjects · ${documents.filter(doc => doc.folder_id === folder.id).length} files`;
+    return <div key={`subject-${folder.id}`} className={cn('flex min-w-0 items-center gap-2.5 transition hover:bg-canvas/60', layout === 'grid' ? 'card p-4' : 'px-3 py-2 sm:px-4')}>
+      {layout === 'list' && <span aria-hidden="true" className="w-4 shrink-0" />}
+      <button className="flex min-w-0 flex-1 items-center gap-2.5 text-left" title={folder.name} onClick={() => setActiveFolder(folder.id)}>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent dark:bg-accent-dark/40"><FolderOpen size={16} /></span>
+        <span className="min-w-0 flex-1"><span className="flex items-center gap-1.5 text-xs font-medium"><FolderDot id={folder.id} /><span className="truncate">{folder.name}</span></span><span className="mt-0.5 block text-[11px] text-muted">{details}</span></span><ChevronRight size={14} className="shrink-0 text-muted" />
+      </button>
+      <button className="icon-btn h-8 w-8" title={`Edit ${folder.name}`} aria-label={`Edit ${folder.name}`} onClick={() => openFolderDialog(folder)}><Pencil size={14} /></button>
+    </div>;
+  };
   const storage = documents.reduce((sum, doc) => sum + doc.size, 0);
 
   return (
@@ -177,35 +230,42 @@ export default function Files() {
           <button className="icon-btn h-8 w-8" title={currentFolder ? 'New subsubject' : 'New subject'} aria-label={currentFolder ? 'New subsubject' : 'New subject'} onClick={() => openFolderDialog('new', typeof activeFolder === 'number' ? activeFolder : null)}><FolderPlus size={16} /></button>
           {currentFolder && <><button className="icon-btn h-8 w-8" title="Edit subject" aria-label="Edit subject" onClick={() => openFolderDialog(currentFolder)}><Pencil size={15} /></button><button className="icon-btn h-8 w-8 hover:text-red-600" title="Delete subject" aria-label="Delete subject" onClick={() => setFolderDelete(currentFolder)}><Trash2 size={15} /></button></>}
         </div>
-        {activeFolder !== 'unfiled' && childFolders.length > 0 && <div className={cn(activeFolder === 'root' ? 'grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' : 'max-h-64 overflow-y-auto rounded-xl border border-line bg-surface')}>
-          {activeFolder !== 'root' && <div className="sticky top-0 z-10 border-b border-line bg-surface px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted">Subsubjects · {childFolders.length}</div>}
-          {childFolders.map(folder => <div key={folder.id} className={cn('flex min-w-0 items-center gap-2 hover:bg-canvas', activeFolder === 'root' ? 'card p-2' : 'border-b border-line px-3 py-1 last:border-0')}><button className={cn('flex min-w-0 flex-1 items-center gap-2 text-left', activeFolder === 'root' ? 'py-1' : 'py-2')} title={folder.name} onClick={() => setActiveFolder(folder.id)}><FolderDot id={folder.id} /><FolderOpen size={activeFolder === 'root' ? 20 : 17} className="shrink-0 text-accent" /><span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold">{folder.name}</span><span className="mt-1 block text-[10px] text-muted">{folders.filter(item => item.parent_id === folder.id).length} subjects · {documents.filter(doc => doc.folder_id === folder.id).length} files</span></span><ChevronRight size={13} className="shrink-0 text-muted" /></button><button className="icon-btn h-7 w-7" aria-label={`Edit ${folder.name}`} onClick={() => openFolderDialog(folder)}><Pencil size={12} /></button></div>)}
-        </div>}
-        <p className="mt-2 text-xs text-muted">{currentFolder ? 'Showing files in this subject. New uploads are saved here.' : activeFolder === 'unfiled' ? 'Files without an assigned subject. Uploads made from the library appear here; use the move icon on a file to organize it.' : 'Choose a subject to see its files, or open Unfiled. Files are shown within their subjects.'}</p>
+        <p className="mt-2 text-xs text-muted">{currentFolder ? 'Showing subsubjects and files together. New uploads are saved here.' : activeFolder === 'unfiled' ? 'Files without an assigned subject. Uploads made from the library appear here; use the move icon on a file to organize it.' : 'Choose a subject to see its files, or open Unfiled. Files are shown within their subjects.'}</p>
       </section>
 
       <p className="mb-3 text-[11px] text-muted">PDF, text, images & Office documents · Up to 25 MB each</p>
       {uploading.length > 0 && <div role="status" className="mb-3 flex items-center gap-2 text-xs text-muted"><Spinner />Uploading {uploading.length} {uploading.length === 1 ? 'file' : 'files'}… <span className="truncate">{uploading[0]}</span></div>}
-      {activeFolder !== 'root' && <>
       <section className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative flex-1 sm:max-w-xs"><Search size={15} className="absolute left-3 top-3 text-muted" /><input className="field h-10 pl-9 pr-8" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your library…" />{query && <button className="icon-btn absolute right-0.5 top-0.5 h-9 w-9" onClick={() => setQuery('')}><X size={14} /></button>}</div>
         <div className="subtle-scrollbar flex flex-1 gap-1 overflow-x-auto">{[['all', 'All types'], ['pdf', 'PDFs'], ['office', 'Office'], ['notes', 'Text & notes'], ['images', 'Images']].map(([value, label]) => <button key={value} onClick={() => setFilter(value)} className={cn('whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium transition', filter === value ? 'bg-accent-soft text-accent-dark dark:bg-accent-dark/40 dark:text-emerald-100' : 'text-muted hover:bg-surface hover:text-ink')}>{label}</button>)}</div>
         <div className="flex items-center rounded-xl border border-line bg-surface p-1"><button className={cn('icon-btn h-7 w-7 rounded-md', layout === 'grid' && 'bg-canvas text-ink')} onClick={() => setLayout('grid')} aria-label="Grid view"><Grid2X2 size={14} /></button><button className={cn('icon-btn h-7 w-7 rounded-md', layout === 'list' && 'bg-canvas text-ink')} onClick={() => setLayout('list')} aria-label="List view"><List size={15} /></button></div>
       </section>
 
-      <div className="mb-3 flex items-center justify-between text-[11px] text-muted"><span>{filtered.length} {filtered.length === 1 ? 'document' : 'documents'}</span><span className="flex items-center gap-1.5"><HardDrive size={12} />{formatBytes(storage)} stored locally</span></div>
+      {filtered.length > 0 && <div className="mb-2 flex items-center gap-3 text-xs text-muted">
+        <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" className="h-4 w-4 accent-accent" aria-label="Select all visible files" checked={filtered.every(doc => selectedIds.has(doc.id))} ref={element => { if (element) element.indeterminate = filtered.some(doc => selectedIds.has(doc.id)) && !filtered.every(doc => selectedIds.has(doc.id)); }} onChange={event => setSelectedIds(event.target.checked ? new Set(filtered.map(doc => doc.id)) : new Set())} />Select all</label>
+        {selectedIds.size > 0 && <><span role="status">{selectedIds.size} selected</span><button className="icon-btn h-8 w-8" title="Move selected files" aria-label="Move selected files" onClick={() => openMove([...selectedIds], typeof activeFolder === 'number' ? activeFolder : null)}><Move size={15} /></button><button className="icon-btn h-8 w-8" title="Clear selection" aria-label="Clear selection" onClick={() => setSelectedIds(new Set())}><X size={14} /></button></>}
+      </div>}
 
-      {!loaded ? <div className="flex h-64 items-center justify-center"><Spinner /></div> : filtered.length === 0 ? <div className="card"><EmptyState icon={<FolderOpen size={24} />} title={currentFolder ? 'No files in this subject' : documents.length ? 'No matching documents' : 'Your library is ready for its first file'} description={documents.length ? 'Try another search or filter to find what you need.' : 'Upload a syllabus, lecture slides, or notes. StudyOS will make them searchable for you and your tutor.'} action={!documents.length && <Button onClick={() => fileInput.current?.click()} icon={<UploadCloud size={16} />}>Choose a file</Button>} /></div>
-        : layout === 'grid' ? <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{filtered.map((doc) => <article key={doc.id} onClick={() => navigate(`/files/${doc.id}?folder=${activeFolder}`)} className="card group cursor-pointer overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-float">
-          <div className="relative flex h-32 items-center justify-center border-b border-line bg-canvas/65"><span className={cn('flex h-16 w-14 items-center justify-center rounded-xl shadow-sm transition group-hover:scale-105', iconTone(doc.extension))}><DocumentIcon extension={doc.extension} size={28} /></span><span className="absolute bottom-3 right-3 rounded-md bg-surface/90 px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted shadow-sm">{doc.extension.replace('.', '')}</span><div className="absolute right-2 top-2 flex opacity-0 transition group-hover:opacity-100"><button className="icon-btn h-8 w-8 bg-surface/90 shadow-sm" onClick={(event) => { event.stopPropagation(); downloadDocument(doc.id, doc.name); }} aria-label="Download"><Download size={14} /></button><button className="icon-btn h-8 w-8 bg-surface/90 shadow-sm hover:text-red-600" onClick={(event) => { event.stopPropagation(); setDeleteTarget(doc); }} aria-label="Delete"><Trash2 size={14} /></button></div></div>
+      <div className="mb-3 flex items-center justify-between text-[11px] text-muted"><span>{visibleSubjects.length} {visibleSubjects.length === 1 ? 'subject' : 'subjects'} · {filtered.length} {filtered.length === 1 ? 'document' : 'documents'}</span><span className="flex items-center gap-1.5"><HardDrive size={12} />{formatBytes(storage)} stored locally</span></div>
+
+      {!loaded ? <div className="flex h-64 items-center justify-center"><Spinner /></div> : entries.length === 0 ? <div className="card"><EmptyState icon={<FolderOpen size={24} />} title={query || filter !== 'all' ? 'No matching items' : currentFolder ? 'This subject is empty' : 'Your library is ready for its first file'} description={documents.length ? 'Try another search or filter to find what you need.' : 'Upload a syllabus, lecture slides, or notes. StudyOS will make them searchable for you and your tutor.'} action={!documents.length && <Button onClick={() => fileInput.current?.click()} icon={<UploadCloud size={16} />}>Choose a file</Button>} /></div>
+        : layout === 'grid' ? <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{entries.map(item => { if (item.kind === 'subject') return subjectItem(item.folder); const doc = item.document; return <article key={doc.id} onClick={() => navigate(`/files/${doc.id}?folder=${activeFolder}`)} className="card group cursor-pointer overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-float">
+          <div className="relative flex h-32 items-center justify-center border-b border-line bg-canvas/65"><span className="absolute left-3 top-3 z-10 flex">{selectionCheckbox(doc)}</span><span className={cn('flex h-16 w-14 items-center justify-center rounded-xl shadow-sm transition group-hover:scale-105', iconTone(doc.extension))}><DocumentIcon extension={doc.extension} size={28} /></span><span className="absolute bottom-3 right-3 rounded-md bg-surface/90 px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted shadow-sm">{doc.extension.replace('.', '')}</span><div className="absolute right-2 top-2 flex opacity-0 transition group-hover:opacity-100"><button className="icon-btn h-8 w-8 bg-surface/90 shadow-sm" onClick={(event) => { event.stopPropagation(); downloadDocument(doc.id, doc.name); }} aria-label="Download"><Download size={14} /></button><button className="icon-btn h-8 w-8 bg-surface/90 shadow-sm hover:text-red-600" onClick={(event) => { event.stopPropagation(); setDeleteTarget(doc); }} aria-label="Delete"><Trash2 size={14} /></button></div></div>
           <div className="p-4"><h3 className="truncate text-sm font-semibold" title={doc.name}>{doc.name}</h3><div className="mt-2 flex items-center justify-between text-[10px] text-muted"><span>{formatBytes(doc.size)} · {formatDistanceToNow(parseISO(doc.created_at), { addSuffix: true })}</span>{doc.status === 'processing' ? <span className="flex items-center gap-1 text-amber-600"><Loader2 size={11} className="animate-spin" />Indexing</span> : doc.status === 'ready' ? <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 size={11} />AI ready</span> : <span className="text-red-500">Read error</span>}</div>{folderPicker(doc)}</div>
-        </article>)}</div>
-        : <div className="card divide-y divide-line overflow-hidden">{filtered.map((doc) => <div key={doc.id} onClick={() => navigate(`/files/${doc.id}?folder=${activeFolder}`)} className="group flex cursor-pointer items-center gap-2.5 px-3 py-2 transition hover:bg-canvas/60 sm:px-4"><span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', iconTone(doc.extension))}><DocumentIcon extension={doc.extension} size={16} /></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{doc.name}</p>{folderPicker(doc)}<p className="mt-1 text-[10px] text-muted sm:hidden">{formatBytes(doc.size)} · {doc.status}</p></div><span className="hidden w-20 text-xs text-muted md:block">{formatBytes(doc.size)}</span><span className="hidden w-28 text-xs capitalize text-muted sm:block">{doc.status === 'ready' ? 'AI ready' : doc.status}</span><span className="hidden w-32 text-xs text-muted lg:block">{formatDistanceToNow(parseISO(doc.created_at), { addSuffix: true })}</span><button className="icon-btn" onClick={(event) => { event.stopPropagation(); downloadDocument(doc.id, doc.name); }} aria-label="Download"><Download size={15} /></button><button className="icon-btn hover:text-red-600" onClick={(event) => { event.stopPropagation(); setDeleteTarget(doc); }} aria-label="Delete"><Trash2 size={15} /></button></div>)}</div>}
+        </article>; })}</div>
+        : <div className="card divide-y divide-line overflow-hidden">{entries.map(item => { if (item.kind === 'subject') return subjectItem(item.folder); const doc = item.document; return <div key={doc.id} onClick={() => navigate(`/files/${doc.id}?folder=${activeFolder}`)} className="group flex cursor-pointer items-center gap-2.5 px-3 py-2 transition hover:bg-canvas/60 sm:px-4">{selectionCheckbox(doc)}<span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', iconTone(doc.extension))}><DocumentIcon extension={doc.extension} size={16} /></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{doc.name}</p>{folderPicker(doc)}<p className="mt-1 text-[10px] text-muted sm:hidden">{formatBytes(doc.size)} · {doc.status}</p></div><span className="hidden w-20 text-xs text-muted md:block">{formatBytes(doc.size)}</span><span className="hidden w-28 text-xs capitalize text-muted sm:block">{doc.status === 'ready' ? 'AI ready' : doc.status}</span><span className="hidden w-32 text-xs text-muted lg:block">{formatDistanceToNow(parseISO(doc.created_at), { addSuffix: true })}</span><button className="icon-btn" onClick={(event) => { event.stopPropagation(); downloadDocument(doc.id, doc.name); }} aria-label="Download"><Download size={15} /></button><button className="icon-btn hover:text-red-600" onClick={(event) => { event.stopPropagation(); setDeleteTarget(doc); }} aria-label="Delete"><Trash2 size={15} /></button></div>; })}</div>}
 
-      </>}
       {folderDialog && <Modal title={folderDialog === 'new' ? folderParent === null ? 'New subject' : 'New subsubject' : 'Edit subject'} onClose={() => { if (!folderBusy) setFolderDialog(null); }}><form onSubmit={event => { event.preventDefault(); saveFolder(); }}><label className="block text-sm">Subject name<input autoFocus className="field mt-2" placeholder="e.g. Biology" maxLength={80} value={folderName} onChange={event => setFolderName(event.target.value)} /></label><p className="mt-4 text-xs font-medium text-muted">Parent subject</p><div className="mt-2 flex h-60 flex-col overflow-hidden rounded-xl border border-line"><FolderTree folders={folders} showRoot={false} rootLabel="Library root" selected={folderParent ?? 'unfiled'} excluded={folderDialog === 'new' ? new Set() : descendantIds(folders, folderDialog.id)} onSelect={value => setFolderParent(typeof value === 'number' ? value : null)} /></div><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="ghost" disabled={folderBusy} onClick={() => setFolderDialog(null)}>Cancel</Button><Button type="submit" disabled={!folderName.trim()} loading={folderBusy}>Save subject</Button></div></form></Modal>}
       {folderDelete && <Modal title={`Delete “${folderDelete.name}”?`} description="Only this subject is removed. Its files move to Unfiled. Its subsubjects move up one level, keeping their files and organization." onClose={() => { if (!folderBusy) setFolderDelete(null); }}><div className="flex justify-end gap-2"><Button variant="ghost" disabled={folderBusy} onClick={() => setFolderDelete(null)}>Keep subject</Button><Button variant="danger" loading={folderBusy} onClick={removeFolder}>Delete subject</Button></div></Modal>}
-      {moveTarget && <Modal title={`Move “${moveTarget.name}”`} onClose={() => setMoveTarget(null)}><div className="flex h-80 flex-col overflow-hidden rounded-xl border border-line"><FolderTree folders={folders} showRoot={false} selected={moveDestination ?? 'unfiled'} onSelect={value => setMoveDestination(typeof value === 'number' ? value : null)} /></div><div className="mt-4 flex justify-end gap-2"><Button variant="ghost" onClick={() => setMoveTarget(null)}>Cancel</Button><Button onClick={async () => { if (await moveFile(moveTarget, moveDestination === null ? '' : String(moveDestination))) setMoveTarget(null); }}>Move file</Button></div></Modal>}
+      {moveIds.length > 0 && <Modal title={`Move ${moveIds.length} ${moveIds.length === 1 ? 'file' : 'files'}`} onClose={() => { if (!moveBusy) setMoveIds([]); }}>
+        <p className="mb-2 text-xs text-muted">{createDestination ? 'Choose the parent subject for your new subsubject.' : 'Choose a destination subject, or create a new subsubject inside it.'}</p>
+        <fieldset disabled={moveBusy} className="min-w-0">
+          <div className="flex h-60 flex-col overflow-hidden rounded-xl border border-line"><FolderTree folders={folders} showRoot={false} rootLabel={createDestination ? 'Library root' : 'Unfiled'} selected={moveDestination ?? 'unfiled'} onSelect={value => setMoveDestination(typeof value === 'number' ? value : null)} /></div>
+          <label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" className="h-4 w-4 accent-accent" checked={createDestination} onChange={event => setCreateDestination(event.target.checked)} /><FolderPlus size={14} />Create a new subsubject</label>
+          {createDestination && <label className="mt-3 block text-xs">New subsubject name<input className="field mt-1" value={newDestinationName} onChange={event => setNewDestinationName(event.target.value)} maxLength={80} placeholder="e.g. Chapter 1" /></label>}
+        </fieldset>
+        <div className="mt-4 flex justify-end gap-2"><Button variant="ghost" disabled={moveBusy} onClick={() => setMoveIds([])}>Cancel</Button><Button loading={moveBusy} disabled={createDestination && !newDestinationName.trim()} onClick={moveFiles}>{createDestination ? 'Create & move' : 'Move files'}</Button></div>
+      </Modal>}
       {deleteTarget && <Modal title="Delete this document?" description={`“${deleteTarget.name}” and its private search index will be permanently removed. This cannot be undone.`} onClose={() => setDeleteTarget(null)}><div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setDeleteTarget(null)}>Keep file</Button><Button variant="danger" loading={deleting} onClick={remove} icon={<Trash2 size={15} />}>Delete document</Button></div></Modal>}
       </div></div>
     </div>
