@@ -1,6 +1,6 @@
 import {
   ArrowUp, BookOpen, Bot, Check, ChevronDown, FileText, History, Library,
-  MessageSquarePlus, PanelLeftClose, Plus, Sparkles, Trash2, User,
+  MessageSquarePlus, PanelLeftClose, Plus, Sparkles, Trash2, User, FilePlus2, ArrowUpRight,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,11 +9,12 @@ import { Markdown, Spinner } from '../components/ui';
 import { useToast } from '../context/ToastContext';
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
-import type { AiStatus, ChatMessage, ChatResponse, Conversation, Source, StudyDocument } from '../types';
+import type { AiStatus, ChatMessage, ChatResponse, Conversation, Source, StudyDocument, Note } from '../types';
 
 const suggestions = [
   { title: 'Make it clear', prompt: 'Explain the most difficult concept in my materials with a simple example.', icon: Sparkles },
   { title: 'Active recall', prompt: 'Create 10 active-recall questions from my study materials, without answers.', icon: BookOpen },
+  { title: 'Create a study note', prompt: '/note Create a structured Markdown study note from my materials, with key concepts, worked examples, and recall questions.', icon: FilePlus2 },
   { title: 'Find the essentials', prompt: 'Summarize the key ideas I should know for an exam, with citations.', icon: Library },
   { title: 'Test my understanding', prompt: 'Quiz me one question at a time on the selected documents. Wait for my answer before giving feedback.', icon: MessageSquarePlus },
 ];
@@ -34,6 +35,8 @@ export default function AiTutor() {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
+  const [noteMode, setNoteMode] = useState(false);
+  const [savingNote, setSavingNote] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -66,8 +69,9 @@ export default function AiTutor() {
     } catch (error) { toast(error instanceof Error ? error.message : 'Could not delete conversation', 'error'); }
   };
 
-  const send = async (text = input) => {
-    const message = text.trim();
+  const send = async (text = input, writeNote = noteMode) => {
+    const createNote = writeNote || /^\/note(?:\s|$)/i.test(text.trim());
+    const message = text.trim().replace(/^\/note\s*/i, '');
     if (!message || loading) return;
     const optimistic: ChatMessage = { id: `user-${Date.now()}`, role: 'user', content: message, sources: [], created_at: new Date().toISOString() };
     setMessages((current) => [...current, optimistic]);
@@ -75,15 +79,27 @@ export default function AiTutor() {
     if (inputRef.current) inputRef.current.style.height = 'auto';
     setLoading(true);
     try {
-      const response = await api<ChatResponse>('/ai/chat', { method: 'POST', body: JSON.stringify({ message, conversation_id: activeId, document_ids: selectedDocuments }) });
+      const response = await api<ChatResponse>('/ai/chat', { method: 'POST', body: JSON.stringify({ message, conversation_id: activeId, document_ids: selectedDocuments, create_note: createNote }) });
       setActiveId(response.conversation_id);
-      setMessages((current) => [...current, { id: `assistant-${Date.now()}`, role: 'assistant', content: response.answer, sources: response.sources, created_at: new Date().toISOString() }]);
+      setMessages((current) => [...current, { id: response.message_id, note_id: response.note?.id, role: 'assistant', content: response.answer, sources: response.sources, created_at: new Date().toISOString() }]);
       loadConversations();
+      if (response.note) toast('Markdown note created in Notes & docs');
     } catch (error) {
       setMessages((current) => current.filter((item) => item.id !== optimistic.id));
       setInput(message);
       toast(error instanceof Error ? error.message : 'Your tutor could not answer right now', 'error');
     } finally { setLoading(false); inputRef.current?.focus(); }
+  };
+
+  const saveAnswer = async (message: ChatMessage) => {
+    if (typeof message.id !== 'number') return;
+    setSavingNote(message.id);
+    try {
+      const note = await api<Note>(`/ai/messages/${message.id}/note`, { method: 'POST' });
+      setMessages(current => current.map(item => item.id === message.id ? { ...item, note_id: note.id } : item));
+      toast('Saved to Notes & docs');
+    } catch (error) { toast(error instanceof Error ? error.message : 'Could not save note', 'error'); }
+    finally { setSavingNote(null); }
   };
 
   const selectedLabel = selectedDocuments.length === 0 ? 'All study materials' : `${selectedDocuments.length} selected ${selectedDocuments.length === 1 ? 'file' : 'files'}`;
@@ -118,17 +134,17 @@ export default function AiTutor() {
             {messages.map((message) => <div key={message.id} className={cn('flex gap-3 animate-slide-up', message.role === 'user' && 'justify-end')}>
               {message.role === 'assistant' && <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent text-white"><Bot size={15} /></span>}
               <div className={cn('min-w-0', message.role === 'user' ? 'max-w-[85%] rounded-2xl rounded-br-md bg-accent px-4 py-3 text-white' : 'flex-1')}>
-                {message.role === 'user' ? <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p> : <><Markdown className="text-sm leading-6 [&_p]:my-2">{message.content}</Markdown><Sources sources={message.sources} /></>}
+                {message.role === 'user' ? <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p> : <><Markdown className="text-sm leading-6 [&_p]:my-2">{message.content}</Markdown><Sources sources={message.sources} />{message.note_id ? <Link to={`/notes?note=${message.note_id}`} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-line bg-canvas px-3 py-2 text-xs font-semibold text-accent"><FileText size={14} />Open saved Markdown note<ArrowUpRight size={13} /></Link> : <button disabled={typeof message.id !== 'number' || savingNote === message.id} onClick={() => saveAnswer(message)} className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-muted hover:bg-canvas hover:text-accent disabled:opacity-40">{savingNote === message.id ? <Spinner className="h-3 w-3" /> : <FilePlus2 size={13} />}Save as note</button>}</>}
               </div>
               {message.role === 'user' && <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full bg-canvas text-muted sm:flex"><User size={15} /></span>}
             </div>)}
-            {loading && <div className="flex gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-white"><Bot size={15} /></span><div className="flex h-10 items-center gap-1.5 rounded-2xl bg-canvas px-4"><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted" /><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:150ms]" /><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:300ms]" /><span className="ml-2 text-[11px] text-muted">Reading your materials…</span></div></div>}
+            {loading && <div className="flex gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-white"><Bot size={15} /></span><div className="flex h-10 items-center gap-1.5 rounded-2xl bg-canvas px-4"><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted" /><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:150ms]" /><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted [animation-delay:300ms]" /><span className="ml-2 text-[11px] text-muted">{noteMode ? 'Writing your note…' : 'Reading your materials…'}</span></div></div>}
             <div ref={endRef} />
           </div>}
         </div>
 
         <div className="shrink-0 bg-gradient-to-t from-surface via-surface to-transparent px-4 pb-4 pt-2 sm:px-7 sm:pb-5">
-          <div className="mx-auto max-w-3xl"><div className="flex items-end gap-2 rounded-2xl border border-line bg-surface p-2 shadow-float transition focus-within:border-accent/50 focus-within:ring-2 focus-within:ring-accent/10"><textarea ref={inputRef} rows={1} className="max-h-36 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 outline-none placeholder:text-muted/65" value={input} onChange={(event) => { setInput(event.target.value); event.target.style.height = 'auto'; event.target.style.height = `${Math.min(event.target.scrollHeight, 144)}px`; }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder="Ask about your study materials…" maxLength={12000} aria-label="Message your study tutor" /><button onClick={() => send()} disabled={!input.trim() || loading} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-white transition hover:bg-accent-hover active:scale-95 disabled:opacity-30" aria-label="Send message">{loading ? <Spinner /> : <ArrowUp size={18} />}</button></div><p className="mt-2 text-center text-[9px] leading-4 text-muted">Enter to send · Shift + Enter for a new line · Verify important details with the cited sources.</p></div>
+          <div className="mx-auto max-w-3xl"><div className="mb-2 flex items-center justify-between gap-2"><div className="flex rounded-lg border border-line p-0.5"><button className={cn('rounded-md px-3 py-1.5 text-xs font-medium', !noteMode ? 'bg-canvas text-ink' : 'text-muted')} aria-pressed={!noteMode} disabled={loading} onClick={() => setNoteMode(false)}>Ask tutor</button><button className={cn('inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium', noteMode ? 'bg-accent-soft text-accent-dark dark:bg-accent-dark dark:text-white' : 'text-muted')} aria-pressed={noteMode} disabled={loading} onClick={() => setNoteMode(true)}><FilePlus2 size={13} />Create note</button></div><span className="hidden text-[10px] text-muted sm:block">{noteMode ? 'Saves Markdown to Notes & docs' : 'Tip: /note creates a study note'}</span></div><div className="flex items-end gap-2 rounded-2xl border border-line bg-surface p-2 shadow-float transition focus-within:border-accent/50 focus-within:ring-2 focus-within:ring-accent/10"><textarea ref={inputRef} rows={1} className="max-h-36 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 outline-none placeholder:text-muted/65" value={input} onChange={(event) => { setInput(event.target.value); event.target.style.height = 'auto'; event.target.style.height = `${Math.min(event.target.scrollHeight, 144)}px`; }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder={noteMode ? "Describe the study note you want to create…" : "Ask about your study materials, or use /note…"} maxLength={12000} aria-label="Message your study tutor" /><button onClick={() => send()} disabled={!input.trim() || loading} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-white transition hover:bg-accent-hover active:scale-95 disabled:opacity-30" aria-label="Send message">{loading ? <Spinner /> : <ArrowUp size={18} />}</button></div><p className="mt-2 text-center text-[9px] leading-4 text-muted">Enter to send · Shift + Enter for a new line · Verify important details with the cited sources.</p></div>
         </div>
       </section>
     </div>

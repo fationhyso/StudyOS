@@ -72,6 +72,7 @@ class NoteOut(BaseModel):
 
 
 class FolderInput(BaseModel):
+    parent_id: int | None = Field(default=None, ge=1)
     name: str = Field(min_length=1, max_length=80)
 
     @field_validator("name")
@@ -83,7 +84,20 @@ class FolderInput(BaseModel):
         return value
 
 
+class FolderUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    parent_id: int | None = Field(default=None, ge=1)
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value):
+        if value is None or not value.strip():
+            raise ValueError("Folder name cannot be empty")
+        return value.strip()
+
+
 class FolderOut(BaseModel):
+    parent_id: int | None
     model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
@@ -207,12 +221,15 @@ class SourceOut(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    create_note: bool = False
     message: str = Field(min_length=1, max_length=12_000)
     conversation_id: int | None = None
     document_ids: list[int] = Field(default_factory=list, max_length=20)
 
 
 class ChatResponse(BaseModel):
+    message_id: int
+    note: NoteOut | None = None
     conversation_id: int
     answer: str
     sources: list[SourceOut]
@@ -229,6 +246,7 @@ class ConversationOut(BaseModel):
 
 
 class MessageOut(BaseModel):
+    note_id: int | None = None
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -240,3 +258,29 @@ class MessageOut(BaseModel):
 
 class ProfileUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
+
+
+class HighlightRect(BaseModel):
+    x: float = Field(ge=0, le=1, allow_inf_nan=False)
+    y: float = Field(ge=0, le=1, allow_inf_nan=False)
+    width: float = Field(gt=0, le=1, allow_inf_nan=False)
+    height: float = Field(gt=0, le=1, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def fits_page(self):
+        if self.x + self.width > 1.001 or self.y + self.height > 1.001:
+            raise ValueError("Highlight must fit within the page")
+        return self
+
+
+class HighlightCreate(BaseModel):
+    page: int = Field(ge=1, le=400)
+    text: str = Field(min_length=1, max_length=10000)
+    rects: list[HighlightRect] = Field(min_length=1, max_length=1000)
+
+
+class HighlightOut(HighlightCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    document_id: int
+    created_at: datetime

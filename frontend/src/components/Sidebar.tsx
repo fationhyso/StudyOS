@@ -33,12 +33,12 @@ export default function Sidebar({ collapsed, onCollapse, mobileOpen, onMobileClo
     <>
       {mobileOpen && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-black/30 backdrop-blur-sm lg:hidden" onClick={onMobileClose} />}
       <aside className={cn(
-        'fixed inset-y-0 left-0 z-40 flex shrink-0 flex-col border-r border-line bg-sidebar transition-[width,transform] duration-300 lg:static lg:translate-x-0',
+        'fixed inset-y-0 left-0 z-40 lg:z-50 flex shrink-0 flex-col border-r border-line bg-sidebar transition-[width,transform] duration-300 lg:static lg:translate-x-0',
         collapsed ? 'lg:w-[76px]' : 'lg:w-[248px]',
         'w-[270px]', mobileOpen ? 'translate-x-0' : '-translate-x-full',
       )}>
-        <div className={cn('flex h-[68px] items-center border-b border-line/70', collapsed ? 'lg:justify-center lg:px-0' : 'px-5', 'justify-between px-5')}>
-          <Link to="/" aria-label="StudyOS dashboard" onClick={onMobileClose}><Logo compact={collapsed} className="lg:hidden" /></Link>
+        <div className={cn('flex h-[68px] items-center border-b border-line/70', collapsed ? 'lg:justify-start lg:px-3' : 'px-3', 'justify-between px-3')}>
+          <Link to="/" className="lg:hidden" aria-label="StudyOS dashboard" onClick={onMobileClose}><Logo compact={collapsed} className="lg:hidden" /></Link>
           <Link to="/" aria-label="StudyOS dashboard" className="hidden lg:block"><Logo compact={collapsed} /></Link>
           <button className="icon-btn lg:hidden" onClick={onMobileClose} aria-label="Close sidebar"><X size={19} /></button>
         </div>
@@ -83,7 +83,7 @@ export default function Sidebar({ collapsed, onCollapse, mobileOpen, onMobileClo
             )}
           </div>
         </div>
-        <button onClick={onCollapse} className={cn('absolute -right-3 top-[86px] hidden h-6 w-6 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-sm transition hover:text-ink lg:flex')} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+        <button onClick={onCollapse} className={cn('absolute -right-3 top-[86px] z-50 hidden h-6 w-6 items-center justify-center rounded-full border border-line bg-surface text-muted shadow-sm transition hover:text-ink lg:flex')} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
           {collapsed ? <ChevronsRight size={13} /> : <ChevronsLeft size={13} />}
         </button>
       </aside>

@@ -65,6 +65,12 @@ def main():
     commands.add_parser('folders')
     p = commands.add_parser('create-folder')
     p.add_argument('name')
+    p.add_argument('--parent-id', type=int)
+    p = commands.add_parser('move-folder')
+    p.add_argument('id', type=int)
+    destination = p.add_mutually_exclusive_group(required=True)
+    destination.add_argument('--parent-id', type=int)
+    destination.add_argument('--root', action='store_true')
     p = commands.add_parser('rename-folder')
     p.add_argument('id', type=int)
     p.add_argument('name')
@@ -79,7 +85,7 @@ def main():
     p.add_argument('id', type=int)
     p = commands.add_parser('complete')
     p.add_argument('id', type=int)
-    for name in ['generate', 'ask']:
+    for name in ['generate', 'ask', 'create-note']:
         p = commands.add_parser(name)
         p.add_argument('--json-file', required=True, help='JSON request body file')
     args = parser.parse_args()
@@ -100,7 +106,9 @@ def main():
     elif args.command == 'folders':
         result = request('GET', '/folders')
     elif args.command == 'create-folder':
-        result = request('POST', '/folders', {'name': args.name})
+        result = request('POST', '/folders', {'name': args.name, 'parent_id': args.parent_id})
+    elif args.command == 'move-folder':
+        result = request('PATCH', f'/folders/{args.id}', {'parent_id': args.parent_id})
     elif args.command == 'rename-folder':
         result = request('PATCH', f'/folders/{args.id}', {'name': args.name})
     elif args.command == 'delete-folder':
@@ -113,6 +121,8 @@ def main():
         result = request('PATCH', f'/schedule/{args.id}', {'completed': True})
     else:
         payload = json.loads(Path(args.json_file).read_text())
+        if args.command == 'create-note':
+            payload['create_note'] = True
         result = request('POST', '/schedule/generate' if args.command == 'generate' else '/ai/chat', payload)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

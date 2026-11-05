@@ -57,11 +57,14 @@ Never claim success on a nonzero exit or timeout. A timed-out create/upload may 
 
 ## Subject folders
 
-Folder management uses the `documents` key permission. List first to resolve names to IDs. If names are ambiguous, ask which folder; never choose an arbitrary match. Subject folders are flat, not nested.
+Folder management uses the `documents` key permission. List first to resolve names to IDs. If names are ambiguous, ask which folder; never choose an arbitrary match. Folders may be nested. Resolve names by their full parent path (e.g. Biology / Semester 1) and parent_id.
 
 ```sh
 python3 scripts/studyos.py folders
 python3 scripts/studyos.py create-folder 'Biology'
+python3 scripts/studyos.py create-folder 'Semester 1' --parent-id 3
+python3 scripts/studyos.py move-folder 4 --parent-id 3
+python3 scripts/studyos.py move-folder 4 --root
 python3 scripts/studyos.py rename-folder 3 'Molecular Biology'
 python3 scripts/studyos.py upload '/absolute/path/syllabus.pdf' --folder-id 3
 python3 scripts/studyos.py files --folder-id 3
@@ -71,4 +74,9 @@ python3 scripts/studyos.py files --unfiled
 python3 scripts/studyos.py delete-folder 3
 ```
 
-Only delete a folder on the user's request. Deleting a folder keeps its documents in Unfiled, with search indexes and study references intact. Report that behavior clearly. Creating a folder or moving a file does not alter its content. Use returned document IDs with the existing plan/tutor commands to work with a subject's files. Check the API response before confirming success. Commands use IDs, not filesystem paths; never delete server directories directly.
+Only delete a folder on the user's request. Deleting a folder keeps its direct documents in Unfiled and moves its child folders to its parent (or the library root), keeping their documents and descendants intact. Report that behavior clearly. Creating a folder or moving a file does not alter its content. Use returned document IDs with the existing plan/tutor commands to work with a subject's files. Check the API response before confirming success. Commands use IDs, not filesystem paths; never delete server directories directly.
+
+
+## Create Markdown notes
+
+Use `python3 scripts/studyos.py create-note --json-file /tmp/studyos-note.json` with a request body such as `{"message":"Create revision notes on energy with LaTeX equations","document_ids":[7]}`. This requires BOTH `ai` and `notes` permissions. Check the returned `note.id` and tell the user to open Notes & docs; do not claim success if `note` is absent or the command fails. Use `$...$` and `$$...$$` for math in Markdown. Existing answers can be saved with `POST /api/ai/messages/{message_id}/note`; repeated saves return the same note. `GET /api/notes/{note_id}/file` exports Markdown with `notes` permission. Offline generation requires readable uploaded material and produces explicitly labeled source excerpts. Do not automatically retry note-generation requests after timeouts; check Notes first to avoid duplicates.

@@ -2,8 +2,8 @@ import {
   CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Circle,
   GripVertical, LayoutGrid, List, Plus, Sparkles,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
-import { addDays, eachDayOfInterval, endOfWeek, format, isSameDay, parseISO, startOfWeek } from 'date-fns';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { addDays, addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, parseISO, startOfMonth, startOfWeek } from 'date-fns';
 import { useSearchParams } from 'react-router-dom';
 import ScheduleGenerator from '../components/ScheduleGenerator';
 import SessionModal from '../components/SessionModal';
@@ -28,27 +28,30 @@ function SessionCard({ session, onEdit, onToggle }: { session: StudySession; onE
 export default function Schedule() {
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const loadSequence = useRef(0);
   const [anchor, setAnchor] = useState(new Date());
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'week' | 'agenda'>('week');
+  const [view, setView] = useState<'week' | 'month' | 'agenda'>('week');
   const [generatorOpen, setGeneratorOpen] = useState(searchParams.get('generate') === '1');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<StudySession | null>(null);
   const [initialDate, setInitialDate] = useState<string>();
   const [dragOver, setDragOver] = useState<string | null>(null);
 
-  const start = startOfWeek(anchor, { weekStartsOn: 1 });
-  const end = endOfWeek(anchor, { weekStartsOn: 1 });
+  const start = startOfWeek(view === 'month' ? startOfMonth(anchor) : anchor, { weekStartsOn: 1 });
+  const end = endOfWeek(view === 'month' ? endOfMonth(anchor) : anchor, { weekStartsOn: 1 });
   const days = useMemo(() => eachDayOfInterval({ start, end }), [start.toISOString(), end.toISOString()]);
 
   const load = useCallback(async () => {
+    const request = ++loadSequence.current;
     setLoading(true);
     try {
-      setSessions(await api<StudySession[]>(`/schedule?start=${format(start, 'yyyy-MM-dd')}&end=${format(end, 'yyyy-MM-dd')}`));
-    } catch (error) { toast(error instanceof Error ? error.message : 'Could not load schedule', 'error'); }
-    finally { setLoading(false); }
+      const result = await api<StudySession[]>(`/schedule?start=${format(start, 'yyyy-MM-dd')}&end=${format(end, 'yyyy-MM-dd')}`);
+      if (request === loadSequence.current) setSessions(result);
+    } catch (error) { if (request === loadSequence.current) toast(error instanceof Error ? error.message : 'Could not load schedule', 'error'); }
+    finally { if (request === loadSequence.current) setLoading(false); }
   }, [format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'), toast]);
 
   useEffect(() => { load(); }, [load]);
@@ -74,23 +77,38 @@ export default function Schedule() {
     if (session && session.date !== date) updateSession(session, { date }, `Moved to ${format(parseISO(date), 'EEEE, MMM d')}`);
   };
 
-  const totalMinutes = sessions.reduce((sum, session) => sum + session.duration_minutes, 0);
-  const completedMinutes = sessions.filter((session) => session.completed).reduce((sum, session) => sum + session.duration_minutes, 0);
+  const periodSessions = view === 'month' ? sessions.filter(session => isSameMonth(parseISO(session.date), anchor)) : sessions;
+  const totalMinutes = periodSessions.reduce((sum, session) => sum + session.duration_minutes, 0);
+  const completedMinutes = periodSessions.filter((session) => session.completed).reduce((sum, session) => sum + session.duration_minutes, 0);
 
   return (
     <div className="flex min-h-full flex-col p-4 sm:p-6 lg:p-8">
       <section className="mb-5 flex flex-col justify-between gap-4 xl:flex-row xl:items-center">
-        <div><h2 className="text-2xl font-semibold tracking-[-.04em]">{format(start, 'MMM d')} – {format(end, start.getMonth() === end.getMonth() ? 'd, yyyy' : 'MMM d, yyyy')}</h2><p className="mt-1 text-xs text-muted">{sessions.length} sessions · {formatMinutes(totalMinutes)} planned{completedMinutes > 0 && ` · ${formatMinutes(completedMinutes)} focused`}</p></div>
+        <div><h2 className="text-2xl font-semibold tracking-[-.04em]">{view === 'month' ? format(anchor, 'MMMM yyyy') : `${format(start, 'MMM d')} – ${format(end, start.getMonth() === end.getMonth() ? 'd, yyyy' : 'MMM d, yyyy')}`}</h2><p className="mt-1 text-xs text-muted">{periodSessions.length} sessions · {formatMinutes(totalMinutes)} planned{completedMinutes > 0 && ` · ${formatMinutes(completedMinutes)} focused`}</p></div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex h-10 items-center rounded-xl border border-line bg-surface p-1 shadow-sm"><button className="icon-btn h-8 w-8" onClick={() => setAnchor(addDays(anchor, -7))} aria-label="Previous week"><ChevronLeft size={17} /></button><button className="h-8 rounded-lg px-2.5 text-xs font-semibold text-muted transition hover:bg-canvas hover:text-ink" onClick={() => setAnchor(new Date())}>Today</button><button className="icon-btn h-8 w-8" onClick={() => setAnchor(addDays(anchor, 7))} aria-label="Next week"><ChevronRight size={17} /></button></div>
-          <div className="hidden h-10 items-center rounded-xl border border-line bg-surface p-1 sm:flex"><button onClick={() => setView('week')} className={cn('flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium', view === 'week' ? 'bg-canvas text-ink shadow-sm' : 'text-muted')}><LayoutGrid size={14} />Week</button><button onClick={() => setView('agenda')} className={cn('flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium', view === 'agenda' ? 'bg-canvas text-ink shadow-sm' : 'text-muted')}><List size={14} />Agenda</button></div>
+          <div className="flex h-10 items-center rounded-xl border border-line bg-surface p-1 shadow-sm"><button className="icon-btn h-8 w-8" onClick={() => setAnchor(view === 'month' ? addMonths(anchor, -1) : addDays(anchor, -7))} aria-label={view === 'month' ? 'Previous month' : 'Previous week'}><ChevronLeft size={17} /></button><button className="h-8 rounded-lg px-2.5 text-xs font-semibold text-muted transition hover:bg-canvas hover:text-ink" onClick={() => setAnchor(new Date())}>Today</button><button className="icon-btn h-8 w-8" onClick={() => setAnchor(view === 'month' ? addMonths(anchor, 1) : addDays(anchor, 7))} aria-label={view === 'month' ? 'Next month' : 'Next week'}><ChevronRight size={17} /></button></div>
+          <div className="flex h-10 items-center rounded-xl border border-line bg-surface p-1"><button onClick={() => setView('week')} className={cn('flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium', view === 'week' ? 'bg-canvas text-ink shadow-sm' : 'text-muted')}><LayoutGrid size={14} />Week</button><button onClick={() => setView('month')} aria-pressed={view === 'month'} className={cn('flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium', view === 'month' ? 'bg-canvas text-ink shadow-sm' : 'text-muted')}><CalendarDays size={14} />Month</button><button onClick={() => setView('agenda')} className={cn('flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium', view === 'agenda' ? 'bg-canvas text-ink shadow-sm' : 'text-muted')}><List size={14} />Agenda</button></div>
           <Button variant="secondary" onClick={() => openCreate()} icon={<Plus size={16} />}><span className="hidden sm:inline">Add session</span></Button>
           <Button onClick={() => setGeneratorOpen(true)} icon={<Sparkles size={16} />}>Generate plan<ChevronDown size={14} className="hidden sm:block" /></Button>
         </div>
       </section>
 
       <div className="card min-h-[560px] flex-1 overflow-hidden">
-        {view === 'week' ? (
+        {view === 'month' ? (
+          <div className="overflow-x-auto" aria-label="Month calendar" aria-busy={loading}>
+            <div className="grid min-w-[700px] grid-cols-7 border-b border-line bg-sidebar">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <div key={day} className="py-3 text-center text-[10px] font-semibold uppercase tracking-wider text-muted">{day}</div>)}</div>
+            <div className="grid min-w-[700px] grid-cols-7">{days.map(day => {
+              const date = localDateString(day);
+              const daySessions = sessions.filter(session => session.date === date).sort((a, b) => a.start_minutes - b.start_minutes);
+              return <section key={date} aria-label={format(day, 'EEEE, MMMM d, yyyy')} onDragOver={event => { event.preventDefault(); setDragOver(date); }} onDragLeave={() => setDragOver(null)} onDrop={event => dropSession(event, date)} className={cn('min-h-36 border-b border-r border-line p-2', !isSameMonth(day, anchor) && 'bg-canvas text-muted', dragOver === date && 'bg-accent-soft dark:bg-accent-dark/30')}>
+                <div className="mb-2 flex items-center justify-between"><button onClick={() => openCreate(date)} className={cn('flex h-7 w-7 items-center justify-center rounded-full text-xs hover:ring-1 hover:ring-accent', isSameDay(day, new Date()) && 'bg-accent text-white')} aria-label={`Add session on ${format(day, 'MMMM d, yyyy')}`}>{format(day, 'd')}</button><button className="icon-btn h-6 w-6" onClick={() => openCreate(date)} aria-label={`New session on ${date}`}><Plus size={12} /></button></div>
+                <div className="space-y-1">{daySessions.slice(0, 3).map(session => <div key={session.id} draggable onDragStart={event => { event.dataTransfer.setData('text/study-session', String(session.id)); event.dataTransfer.effectAllowed = 'move'; }} className={cn('flex min-w-0 items-center gap-1 rounded-md border-l-2 px-1.5 py-1', sessionColors[session.topic] || sessionColors.study, session.completed && 'opacity-50')}>
+                  <button className="min-w-0 flex-1 text-left" onClick={() => openEdit(session)} title={`${formatTime(session.start_minutes)} · ${session.title}`}><span className="block text-[9px] opacity-65">{formatTime(session.start_minutes)}</span><span className={cn('block truncate text-[10px] font-medium', session.completed && 'line-through')}>{session.title}</span></button><button className="shrink-0" aria-label={`${session.completed ? 'Mark incomplete' : 'Mark complete'}: ${session.title}`} onClick={() => updateSession(session, { completed: !session.completed })}>{session.completed ? <Check size={11} /> : <Circle size={11} />}</button>
+                </div>)}{daySessions.length > 3 && <button className="w-full rounded px-1 py-1 text-left text-[10px] font-semibold text-accent hover:bg-canvas" onClick={() => { setAnchor(day); setView('agenda'); }}>+{daySessions.length - 3} more · agenda</button>}</div>
+              </section>;
+            })}</div>
+          </div>
+        ) : view === 'week' ? (
           <div className="subtle-scrollbar h-full overflow-x-auto">
             <div className="grid min-w-[960px] grid-cols-7 divide-x divide-line">
               {days.map((day) => {

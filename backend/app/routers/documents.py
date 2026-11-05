@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 from ..config import get_settings
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import Document, User
+from ..models import Document, DocumentHighlight, User
 from ..rate_limit import enforce_rate_limit
-from ..schemas import DocumentContent, DocumentOut, DocumentMove
+from ..schemas import DocumentContent, DocumentOut, DocumentMove, HighlightCreate, HighlightOut
 from .folders import owned_folder
 from ..services.documents import ALLOWED_EXTENSIONS, process_document
 
@@ -172,3 +172,35 @@ def move_document(document_id: int, payload: DocumentMove,
     db.commit()
     db.refresh(document)
     return document
+
+
+@router.get("/{document_id}/highlights", response_model=list[HighlightOut])
+def list_highlights(document_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    owned_document(document_id, user, db)
+    return db.scalars(select(DocumentHighlight).where(DocumentHighlight.document_id == document_id).order_by(DocumentHighlight.page, DocumentHighlight.id)).all()
+
+
+@router.post("/{document_id}/highlights", response_model=HighlightOut, status_code=201)
+def create_highlight(document_id: int, payload: HighlightCreate,
+                     user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    document = owned_document(document_id, user, db)
+    if document.extension != ".pdf" or document.status != "ready" or payload.page > document.page_count:
+        raise HTTPException(422, "Choose a valid page in a ready PDF")
+    enforce_rate_limit(f"pdf-highlight:{user.id}", limit=120, window_seconds=60)
+    highlight = DocumentHighlight(document_id=document_id, **payload.model_dump())
+    db.add(highlight)
+    db.commit()
+    db.refresh(highlight)
+    return highlight
+
+
+@router.delete("/{document_id}/highlights/{highlight_id}", status_code=204)
+def delete_highlight(document_id: int, highlight_id: int,
+                     user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    owned_document(document_id, user, db)
+    highlight = db.scalar(select(DocumentHighlight).where(DocumentHighlight.id == highlight_id, DocumentHighlight.document_id == document_id))
+    if highlight is None:
+        raise HTTPException(404, "Highlight not found")
+    db.delete(highlight)
+    db.commit()
+    return Response(status_code=204)

@@ -16,6 +16,7 @@ export interface Note {
 }
 
 export interface SubjectFolder {
+  parent_id: number | null;
   id: number;
   name: string;
   created_at: string;
@@ -109,9 +110,12 @@ export interface ChatMessage {
   sources: Source[];
   created_at: string;
   pending?: boolean;
+  note_id?: number | null;
 }
 
 export interface ChatResponse {
+  message_id: number;
+  note: Note | null;
   conversation_id: number;
   answer: string;
   sources: Source[];

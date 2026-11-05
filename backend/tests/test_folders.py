@@ -75,6 +75,44 @@ def test_existing_database_upgrade_preserves_documents(tmp_path):
     upgrade_subject_folders(engine)
     upgrade_subject_folders(engine)
     assert 'folder_id' in {column['name'] for column in inspect(engine).get_columns('documents')}
+    assert 'parent_id' in {column['name'] for column in inspect(engine).get_columns('subject_folders')}
     with engine.connect() as connection:
         assert connection.execute(text('SELECT name, folder_id FROM documents')).one() == ('existing.pdf', None)
     engine.dispose()
+
+
+def test_nested_folders_moves_cycles_and_delete(client, auth_headers):
+    def create(name, parent=None):
+        response = client.post('/api/folders', headers=auth_headers, json={'name': name, 'parent_id': parent})
+        assert response.status_code == 201
+        return response.json()['id']
+    root = create('Biology')
+    child = create('Semester 1', root)
+    grandchild = create('Cell Biology', child)
+    file = upload(client, auth_headers, grandchild).json()['id']
+    root_file = upload(client, auth_headers, root).json()['id']
+    for parent in [root, child, grandchild]:
+        response = client.patch(f'/api/folders/{root}', headers=auth_headers, json={'parent_id': parent})
+        assert response.status_code == 422
+    assert client.patch(f'/api/folders/{child}', headers=auth_headers, json={'name': None}).status_code == 422
+    assert client.patch(f'/api/folders/{child}', headers=auth_headers, json={'name': 'Semester One'}).json()['parent_id'] == root
+    assert client.patch(f'/api/folders/{grandchild}', headers=auth_headers, json={'parent_id': None}).json()['parent_id'] is None
+    client.patch(f'/api/folders/{grandchild}', headers=auth_headers, json={'parent_id': child})
+    assert client.delete(f'/api/folders/{root}', headers=auth_headers).status_code == 204
+    folders = {item['id']: item for item in client.get('/api/folders', headers=auth_headers).json()}
+    assert folders[child]['parent_id'] is None
+    assert folders[grandchild]['parent_id'] == child
+    assert client.get(f'/api/documents/{file}', headers=auth_headers).json()['folder_id'] == grandchild
+    assert client.get(f'/api/documents/{root_file}', headers=auth_headers).json()['folder_id'] is None
+    assert client.delete(f'/api/folders/{grandchild}', headers=auth_headers).status_code == 204
+    assert client.get(f'/api/documents/{file}/file', headers=auth_headers).status_code == 200
+
+
+def test_nested_parent_ownership(client, auth_headers):
+    folder = client.post('/api/folders', headers=auth_headers, json={'name': 'Private'}).json()['id']
+    other = client.post('/api/auth/signup', json={'name': 'Other', 'email': 'nested-other@example.com', 'password': 'another-pass'}).json()
+    headers = {'Authorization': f"Bearer {other['token']}"}
+    child = client.post('/api/folders', headers=headers, json={'name': 'Other'}).json()['id']
+    assert client.post('/api/folders', headers=headers, json={'name': 'Nested', 'parent_id': folder}).status_code == 404
+    assert client.patch(f'/api/folders/{child}', headers=headers, json={'parent_id': folder}).status_code == 404
+    assert client.patch(f'/api/folders/{folder}', headers=headers, json={'parent_id': child}).status_code == 404

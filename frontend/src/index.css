@@ -71,3 +71,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* PDF text overlays must remain transparent and preserve PDF.js geometry. */
+.react-pdf__Page__textContent ::selection { background: rgb(96 165 250 / .3); color: transparent; }
+.react-pdf__Page__textContent .pdf-highlight { background: rgb(250 204 21 / .45); color: transparent; padding: 0; margin: 0; border-radius: 0; }
+
+.markdown-body .katex { font-size: 1.08em; }
+.markdown-body .katex-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: .35rem 0; }

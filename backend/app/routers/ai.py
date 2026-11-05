@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from ..config import get_settings
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import ChatMessage, Conversation, Document, User, utcnow
+from ..models import ChatMessage, Conversation, Document, Note, User, utcnow
 from ..rate_limit import enforce_rate_limit
-from ..schemas import ChatRequest, ChatResponse, ConversationOut, MessageOut
+from ..schemas import ChatRequest, ChatResponse, ConversationOut, MessageOut, NoteOut
 from ..services.ai import answer_question
+from ..services.study_notes import build_note, generate_study_note, note_title, with_sources
 
 router = APIRouter(prefix="/api/ai", tags=["AI tutor"])
 
@@ -71,9 +73,12 @@ def delete_conversation(
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     payload: ChatRequest,
+    request: Request,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ChatResponse:
+    if payload.create_note:
+        require_note_permission(request)
     enforce_rate_limit(f"ai-chat:{user.id}", limit=30, window_seconds=60)
     if payload.document_ids:
         count = len(db.scalars(
@@ -100,11 +105,50 @@ async def chat(
     db.add(ChatMessage(conversation_id=conversation.id, role="user", content=payload.message, sources=[]))
     db.commit()
 
-    answer, sources, mode = await answer_question(
-        db, user.id, payload.message, history, payload.document_ids
-    )
+    title = None
+    if payload.create_note:
+        title, answer, sources, mode = await generate_study_note(db, user.id, payload.message, history, payload.document_ids)
+    else:
+        answer, sources, mode = await answer_question(db, user.id, payload.message, history, payload.document_ids)
     assistant = ChatMessage(conversation_id=conversation.id, role="assistant", content=answer, sources=sources)
     conversation.updated_at = utcnow()
     db.add(assistant)
+    db.flush()
+    note = build_note(db, user.id, title, with_sources(answer, sources), assistant.id) if title else None
     db.commit()
-    return ChatResponse(conversation_id=conversation.id, answer=answer, sources=sources, mode=mode)
+    return ChatResponse(conversation_id=conversation.id, message_id=assistant.id, answer=answer, sources=sources,
+                        mode=mode, note=NoteOut.model_validate(note) if note else None)
+
+
+
+def require_note_permission(request: Request) -> None:
+    key = getattr(request.state, "agent_key", None)
+    if key is not None and "notes" not in key.scopes:
+        raise HTTPException(403, "Creating notes requires both ai and notes agent permissions")
+
+
+@router.post("/messages/{message_id}/note", response_model=NoteOut)
+def save_message_as_note(message_id: int, request: Request,
+                         user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    require_note_permission(request)
+    message = db.scalar(select(ChatMessage).join(Conversation).where(
+        ChatMessage.id == message_id, Conversation.user_id == user.id, ChatMessage.role == "assistant"))
+    if message is None:
+        raise HTTPException(404, "Tutor answer not found")
+    existing = db.scalar(select(Note).where(Note.source_message_id == message.id, Note.user_id == user.id))
+    if existing is not None:
+        return existing
+    if not message.content.strip():
+        raise HTTPException(422, "This answer has no note content")
+    enforce_rate_limit(f"ai-note-save:{user.id}", limit=60, window_seconds=60)
+    note = build_note(db, user.id, note_title(message.content), with_sources(message.content, message.sources), message.id)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = db.scalar(select(Note).where(Note.source_message_id == message_id, Note.user_id == user.id))
+        if existing is not None:
+            return existing
+        raise
+    db.refresh(note)
+    return note

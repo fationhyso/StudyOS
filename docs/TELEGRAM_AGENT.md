@@ -119,7 +119,7 @@ Hermes references: [skill format and environment passthrough](https://hermes-age
 
 ## Subject folders (Notability-style organization)
 
-In **Files & resources**, choose **New folder**, enter a subject such as Biology, and select that folder. New uploads go into the selected folder. Each file has a folder selector for moving it. All files shows the whole library; Unfiled shows files with no subject. Folder cards show file counts and rename/delete controls. Deleting a folder **keeps its files in Unfiled**; it does not delete documents or their indexes. Folders are one level deep.
+In **Files & resources**, choose **New folder**, enter a subject such as Biology, and select that folder. New uploads go into the selected folder. Each file has a folder selector for moving it. All files shows the whole library; Unfiled shows files with no subject. The folder browser provides search and expansion controls. The current folder shows its subfolders and Edit/Delete controls. Deleting a folder **keeps its direct files in Unfiled**; it does not delete documents or their indexes. Folders can contain subfolders. Use the searchable folder tree and breadcrumbs to navigate; Edit folder changes its parent. Deleting a folder moves its child folders up one level and preserves their contents.
 
 Your existing `documents` agent permission includes folders. Update the installed Hermes skill/helper by copying the latest `integrations/hermes/studyos` directory to the agent machine again. Then say:
 
@@ -133,7 +133,7 @@ The agent lists folders, resolves their IDs, then calls the relevant endpoint. D
 
 | Action | API |
 | --- | --- |
-| List/create folders | `GET /api/folders`, `POST /api/folders` with `{"name":"Biology"}` |
+| List/create folders | `GET /api/folders`, `POST /api/folders` with `{"name":"Biology","parent_id":null}` |
 | Rename folder | `PATCH /api/folders/3` with `{"name":"Molecular Biology"}` |
 | Delete folder, preserve files | `DELETE /api/folders/3` |
 | Upload into folder | `POST /api/documents?folder_id=3` (multipart field `file`) |
@@ -143,3 +143,11 @@ The agent lists folders, resolves their IDs, then calls the relevant endpoint. D
 | Remove file from folder | `PATCH /api/documents/7` with `{"folder_id":null}` |
 
 All routes above require the `documents` agent permission. Existing installations automatically add a nullable folder link on startup; existing uploads remain Unfiled. Back up your persistent volume before upgrading as usual.
+
+
+Nested folder examples: create with `{"name":"Semester 1","parent_id":3}`; move with `PATCH /api/folders/4` and `{"parent_id":3}`; move to root with `{"parent_id":null}`. Self/descendant moves return 422. Parents must belong to the same account. Update the installed Hermes skill/helper to get `create-folder --parent-id`, `move-folder --parent-id`, and `move-folder --root`.
+
+
+## Ask the tutor to create notes
+
+With an agent key containing both **AI** and **Notes** permissions, send `POST /api/ai/chat` with `{"message":"Create energy revision notes with LaTeX equations","document_ids":[7],"create_note":true}`. The response includes `message_id` and `note` (with its ID, title, and Markdown content). The note is saved in Notes & docs. The updated Hermes helper provides `create-note --json-file /path/request.json`. To save an existing tutor answer, call `POST /api/ai/messages/{message_id}/note`; repeated calls return the same saved note. Download the actual `.md` representation at `GET /api/notes/{note_id}/file` with Notes permission. Your separate Hermes model does not need to generate the file itself.

@@ -58,3 +58,14 @@ export async function downloadDocument(documentId: number, filename: string) {
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+
+export function downloadMarkdownNote(title: string, content: string) {
+  const name = title.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').trim().slice(0, 120) || 'Untitled';
+  const url = URL.createObjectURL(new Blob([content], { type: 'text/markdown;charset=utf-8' }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = name.toLowerCase().endsWith('.md') ? name : `${name}.md`;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

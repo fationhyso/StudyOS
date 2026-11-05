@@ -5,10 +5,10 @@ A calm, private, self-hosted study workspace. StudyOS combines a Notion-style no
 ## What’s included
 
 - **Dashboard:** today’s focus, weekly progress, study streaks, quick capture, recent materials, and upcoming sessions.
-- **Study schedule:** week and agenda views, manual sessions, completion tracking, drag-to-reschedule, and personalized schedule generation with spaced review and active recall.
+- **Study schedule:** month, week, and agenda views, manual sessions, completion tracking, drag-to-reschedule, and personalized schedule generation with spaced review and active recall.
 - **Notes & docs:** searchable, reorderable pages with favorites, autosave, Markdown formatting, preview, and split view.
 - **Files & resources:** drag-and-drop uploads for PDF, TXT, Markdown, PNG/JPEG/WebP, DOCX, PPTX, and XLSX. Images are indexed with OCR.
-- **PDF viewer:** page navigation, zoom, rotation, full-screen mode, selectable text, cross-page search, match navigation, and highlighting.
+- **PDF viewer:** continuous scrolling with nearby-page rendering, page navigation, zoom, rotation, full-screen mode, selectable text, cross-page search, match navigation, and highlighting.
 - **AI tutor:** persistent conversations, document scoping, source citations, and direct links to referenced files.
 - **Private accounts:** JWT authentication, bcrypt password hashing, per-user authorization, and isolated documents, notes, conversations, and schedules.
 - **Light and dark themes**, responsive navigation, keyboard-friendly dialogs, and reduced-motion support.
@@ -170,9 +170,9 @@ npm run build
 
 ## Verification and current limits
 
-The production React build and twenty-six backend tests pass. Tests cover signup/login, notes, private document access, indexing and cited retrieval, schedule generation, invalid AI schedule fallback, disabling registration, agent key permissions/expiry/revocation, helper uploads/scheduling, subject folder lifecycle/privacy, and existing database upgrades. The served login screen was also checked in a browser. Docker image execution requires Docker Engine or Docker Desktop and was not verified in the development environment.
+The production React build and thirty-six backend tests and eight frontend tests pass. Tests cover signup/login, notes, private document access, indexing and cited retrieval, schedule generation, invalid AI schedule fallback, disabling registration, agent key permissions/expiry/revocation, helper uploads/scheduling, subject folder lifecycle/privacy, and existing database upgrades. Browser checks covered PDF selection and saved highlights, nested folder navigation, the month calendar, and both notes/sidebar collapse controls. Docker image execution requires Docker Engine or Docker Desktop and was not verified in the development environment.
 
-- PDF highlighting marks search results; saved freehand or selection annotations are not implemented.
+- PDF text highlights are saved to the workspace database, remain aligned through zoom/rotation, and can be revisited or removed in the highlights panel. Freehand drawing and embedding annotations into downloaded PDF files are not implemented.
 - PDF extraction reads embedded text. Scanned PDFs need OCR before upload; image uploads use Tesseract OCR.
 - Notes use Markdown editing with reorderable pages, rather than a full Notion block editor.
 - Offline tutoring returns source passages. Synthesized answers require a configured AI provider.
@@ -210,3 +210,26 @@ sudo docker compose up --build -d
 The tutor displays the selected provider/model. This indicates configuration, not a successful connectivity/balance check. When its API is unavailable, times out, or returns invalid/empty output, the existing offline retrieval/planner fallback is used. Keys stay on the backend. Questions, conversation context, and retrieved excerpts (or schedule material excerpts) are sent to the selected provider when you use AI features.
 
 `AI_PROVIDER=openai` preserves the existing `OPENAI_*` configuration. `AI_PROVIDER=offline` disables all external AI requests even if keys are present. Only the selected provider's key is used; failures do not forward your material to another provider. This setting controls StudyOS's tutor/planner; it does not change the model used by your separate Hermes Telegram agent. DeepSeek integration is verified with mocked API responses, not a paid live request.
+
+
+The resource library now supports nested folders, a searchable tree, breadcrumbs, and searchable file/folder move dialogs. Deleting a folder moves its direct files to Unfiled and promotes its immediate subfolders one level. Existing folders become root folders during the additive upgrade. The schedule Month view supports date navigation, session creation/editing/completion, and dragging sessions between days; crowded days link to the agenda. Notes has a toolbar control for collapsing its page list, and the workspace collapse arrow stays above adjacent panels.
+
+
+### Highlighting PDF text
+
+Open a PDF, select text, and click **Save highlight** (or the highlighter toolbar button). The saved-highlight panel lists excerpts by page and lets you jump to or remove them. Highlights persist across sessions and stay private to the account owning the PDF. Continuous scrolling renders pages near the viewport to keep memory use reasonable on a Pi. The original PDF download remains unchanged; annotations live in the database and are included in data-volume backups.
+
+
+## AI-created Markdown notes and LaTeX
+
+In AI study tutor, select **Create note** and describe what to write, or send `/note Create a revision guide from my materials`. Generated notes are saved automatically to Notes & docs with source links and an **Open saved Markdown note** button. Any existing assistant response also has **Save as note**. Repeatedly saving the same response reopens the same note rather than duplicating it. Deleting a chat keeps its saved notes. If the provider is unavailable, readable uploaded material can be saved as clearly labeled source excerpts; no note is created when neither material nor a working provider is available.
+
+Notes open in rendered preview by default. Use **Edit** or **⌘+E** (Mac) / **Ctrl+E** (Windows/Linux) to toggle editing and preview. Inline math uses `$E=mc^2$`. Put `$$` on separate lines around display equations, for example:
+
+```markdown
+$$
+\int_0^1 x^2\,dx = \frac{1}{3}
+$$
+```
+
+LaTeX math is rendered locally with KaTeX in notes, the tutor, and Markdown file previews; no external rendering service is used. Raw HTML is not enabled, and unsafe KaTeX extensions are disabled. The download button exports the current Markdown draft as `.md` (including its LaTeX source). Persistent notes remain in SQLite and are included in the existing data-volume backup. Authenticated API clients can export saved notes at `/api/notes/{id}/file`. Agent note creation requires both `ai` and `notes` permissions.

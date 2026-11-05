@@ -1,3 +1,6 @@
+from urllib.parse import quote
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -69,3 +72,16 @@ def delete_note(
     db.delete(note)
     db.commit()
     return Response(status_code=204)
+
+
+@router.get("/{note_id}/file")
+def export_markdown(note_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    note = db.scalar(select(Note).where(Note.id == note_id, Note.user_id == user.id))
+    if note is None:
+        raise HTTPException(404, "Note not found")
+    name = re.sub(r'[\\/\r\n\x00-\x1f]', '_', note.title).strip()[:100] or "Untitled"
+    if not name.lower().endswith(".md"):
+        name += ".md"
+    return Response(content=note.content, media_type="text/markdown; charset=utf-8",
+                    headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(name, safe=""),
+                             "Cache-Control": "no-store"})

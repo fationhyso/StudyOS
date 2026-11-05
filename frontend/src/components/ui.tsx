@@ -3,6 +3,9 @@ import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 're
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { cn } from '../lib/utils';
 
 export function Logo({ compact = false, className = '' }: { compact?: boolean; className?: string }) {
@@ -93,7 +96,7 @@ export function EmptyState({ icon, title, description, action }: { icon: ReactNo
 }
 
 export function Markdown({ children, className = '' }: { children: string; className?: string }) {
-  return <div className={cn('markdown-body', className)}><ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown></div>;
+  return <div className={cn('markdown-body', className)}><ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[[rehypeKatex, { trust: false, strict: false }]]}>{children}</ReactMarkdown></div>;
 }
 
 export function Skeleton({ className = '' }: { className?: string }) {

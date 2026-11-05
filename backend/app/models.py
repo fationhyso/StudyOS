@@ -28,6 +28,8 @@ class User(Base):
 class SubjectFolder(Base):
     __tablename__ = "subject_folders"
 
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("subject_folders.id", ondelete="SET NULL"), nullable=True, index=True)
+
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(80))
@@ -71,6 +73,9 @@ class DocumentChunk(Base):
 
 class Note(Base):
     __tablename__ = "notes"
+
+    source_message_id: Mapped[int | None] = mapped_column(ForeignKey("chat_messages.id", ondelete="SET NULL"), nullable=True, unique=True)
+    source_message: Mapped["ChatMessage | None"] = relationship(back_populates="saved_note")
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
@@ -121,6 +126,12 @@ class Conversation(Base):
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
+    saved_note: Mapped["Note | None"] = relationship(back_populates="source_message", uselist=False, passive_deletes=True)
+
+    @property
+    def note_id(self) -> int | None:
+        return self.saved_note.id if self.saved_note is not None else None
+
     id: Mapped[int] = mapped_column(primary_key=True)
     conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
     role: Mapped[str] = mapped_column(String(20))
@@ -143,3 +154,14 @@ class AgentKey(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class DocumentHighlight(Base):
+    __tablename__ = "document_highlights"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"), index=True)
+    page: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    rects: Mapped[list] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
