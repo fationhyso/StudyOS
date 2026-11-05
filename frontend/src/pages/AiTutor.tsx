@@ -1,16 +1,17 @@
 import {
-  ArrowUp, BookOpen, Bot, Check, ChevronDown, FileText, History, Library,
+  ArrowUp, BookOpen, Bot, ChevronDown, FileText, History, Library,
   MessageSquarePlus, PanelLeftClose, Plus, Sparkles, Trash2, User, FilePlus2, ArrowUpRight, CalendarPlus,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow, parseISO } from 'date-fns';
+import { FolderDot, folderPath } from '../components/FolderBrowser';
 import { Markdown, Spinner } from '../components/ui';
 import { useToast } from '../context/ToastContext';
 import { tutorRequest, type TutorMode } from '../lib/tutorAction';
 import { api } from '../lib/api';
 import { cn, localDateString, formatTime } from '../lib/utils';
-import type { AiStatus, ChatMessage, ChatResponse, Conversation, Source, StudyDocument, Note } from '../types';
+import type { AiStatus, ChatMessage, ChatResponse, Conversation, Source, StudyDocument, SubjectFolder, Note } from '../types';
 
 const suggestions = [
   { title: 'Make it clear', prompt: 'Explain the most difficult concept in my materials with a simple example.', icon: Sparkles },
@@ -30,8 +31,8 @@ function Sources({ sources }: { sources: Source[] }) {
 export default function AiTutor() {
   const { toast } = useToast();
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
-  const [selectedDocuments, setSelectedDocuments] = useState<number[]>([]);
-  const [documentMenu, setDocumentMenu] = useState(false);
+  const [subjects, setSubjects] = useState<SubjectFolder[]>([]);
+  const [selectedSubject, setSelectedSubject] = useState<number | ''>('');
   const [status, setStatus] = useState<AiStatus | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -50,6 +51,7 @@ export default function AiTutor() {
 
   const loadConversations = useCallback(() => api<Conversation[]>('/ai/conversations').then(setConversations).catch(() => {}), []);
   useEffect(() => {
+    api<SubjectFolder[]>('/folders').then(setSubjects).catch(() => {});
     api<StudyDocument[]>('/documents').then(setDocuments).catch(() => {});
     api<AiStatus>('/ai/status').then(setStatus).catch(() => {});
     loadConversations();
@@ -77,6 +79,7 @@ export default function AiTutor() {
   const send = async (text = input, requestedMode = mode) => {
     const { action, message } = tutorRequest(text, requestedMode);
     if (!message || loading) return;
+    if (selectedSubject === '') { toast('Choose a subject for your tutor first', 'error'); return; }
     setMode(action);
     const optimistic: ChatMessage = { id: `user-${Date.now()}`, role: 'user', content: message, sources: [], created_at: new Date().toISOString() };
     setMessages((current) => [...current, optimistic]);
@@ -84,7 +87,7 @@ export default function AiTutor() {
     if (inputRef.current) inputRef.current.style.height = 'auto';
     setLoading(true);
     try {
-      const response = await api<ChatResponse>('/ai/chat', { method: 'POST', body: JSON.stringify({ message, conversation_id: activeId, document_ids: selectedDocuments, create_note: action === 'note', create_session: action === 'session', reference_date: localDateString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, session_details: action === 'session' ? { date: sessionDate || null, start_time: sessionTime || null, duration_minutes: sessionMinutes ? Number(sessionMinutes) : null } : null }) });
+      const response = await api<ChatResponse>('/ai/chat', { method: 'POST', body: JSON.stringify({ message, conversation_id: activeId, subject_id: selectedSubject, create_note: action === 'note', create_session: action === 'session', reference_date: localDateString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, session_details: action === 'session' ? { date: sessionDate || null, start_time: sessionTime || null, duration_minutes: sessionMinutes ? Number(sessionMinutes) : null } : null }) });
       setActiveId(response.conversation_id);
       setMessages((current) => [...current, { id: response.message_id, note_id: response.note?.id, calendar_session: response.calendar_session, role: 'assistant', content: response.answer, sources: response.sources, created_at: new Date().toISOString() }]);
       loadConversations();
@@ -108,8 +111,6 @@ export default function AiTutor() {
     finally { setSavingNote(null); }
   };
 
-  const selectedLabel = selectedDocuments.length === 0 ? 'All study materials' : `${selectedDocuments.length} selected ${selectedDocuments.length === 1 ? 'file' : 'files'}`;
-
   return (
     <div className="relative flex h-full min-h-[580px] bg-surface">
       {historyOpen && <button className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setHistoryOpen(false)} aria-label="Close chat history" />}
@@ -124,8 +125,15 @@ export default function AiTutor() {
         <header className="flex min-h-[60px] shrink-0 items-center gap-2 border-b border-line px-3 sm:px-5">
           <button className="icon-btn md:hidden" onClick={() => setHistoryOpen(true)} aria-label="Conversation history"><History size={18} /></button>
           <span className="hidden h-9 w-9 items-center justify-center rounded-xl bg-accent-soft text-accent dark:bg-accent-dark/40 sm:flex"><Bot size={18} /></span>
-          <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Study tutor</h2><p className="hidden text-[10px] text-muted sm:block">Thoughtful answers, grounded in your library</p></div>
-          <div className="relative"><button onClick={() => setDocumentMenu(!documentMenu)} className="flex h-9 max-w-[180px] items-center gap-2 rounded-xl border border-line bg-surface px-3 text-[11px] font-medium text-muted transition hover:text-ink sm:max-w-xs"><BookOpen size={14} className="shrink-0" /><span className="truncate">{selectedLabel}</span><ChevronDown size={12} /></button>{documentMenu && <><button className="fixed inset-0 z-10" onClick={() => setDocumentMenu(false)} aria-label="Close document selection" /><div className="absolute right-0 top-11 z-20 w-72 rounded-xl border border-line bg-surface p-2 shadow-float animate-slide-up"><div className="flex items-center justify-between px-2 py-2"><p className="text-xs font-semibold">Ground answers in</p>{selectedDocuments.length > 0 && <button className="text-[10px] text-accent" onClick={() => setSelectedDocuments([])}>Use all</button>}</div><div className="max-h-64 overflow-y-auto">{readyDocuments.map((doc) => { const selected = selectedDocuments.includes(doc.id); return <label key={doc.id} className="flex cursor-pointer items-center gap-2 rounded-lg p-2.5 hover:bg-canvas"><span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', selected ? 'border-accent bg-accent text-white' : 'border-muted/40')}>{selected && <Check size={11} />}</span><input type="checkbox" className="sr-only" checked={selected} onChange={() => setSelectedDocuments((current) => selected ? current.filter((id) => id !== doc.id) : [...current, doc.id])} /><span className="truncate text-xs">{doc.name}</span></label>; })}</div>{!readyDocuments.length && <div className="p-4 text-center"><FileText size={18} className="mx-auto text-muted" /><p className="mt-2 text-[11px] leading-5 text-muted">Upload and index a file to begin.</p><Link to="/files" className="mt-2 inline-block text-xs font-semibold text-accent">Open library</Link></div>}<p className="border-t border-line px-2 pb-1 pt-2 text-[9px] leading-4 text-muted">With no selection, your tutor searches every ready document.</p></div></>}</div>
+          <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Study tutor</h2><p className="hidden text-[10px] text-muted sm:block">Answers from your selected subject and its subsubjects</p></div>
+          <label className="flex min-w-0 items-center gap-2 text-xs text-muted">
+            {selectedSubject !== '' && <FolderDot id={selectedSubject} />}
+            <span className="sr-only">Study subject</span>
+            <select aria-label="Study subject" disabled={loading} value={selectedSubject} onChange={event => { newChat(); setSelectedSubject(event.target.value ? Number(event.target.value) : ''); }} className="field h-9 max-w-[180px] py-1 text-xs sm:max-w-xs">
+              <option value="">Choose a subject</option>
+              {subjects.map(subject => <option key={subject.id} value={subject.id}>{folderPath(subjects, subject)}</option>)}
+            </select>
+          </label>
           <button className="icon-btn hidden md:inline-flex" onClick={newChat} title="New conversation"><PanelLeftClose size={17} /></button>
         </header>
 
@@ -152,7 +160,7 @@ export default function AiTutor() {
         <div className="shrink-0 bg-gradient-to-t from-surface via-surface to-transparent px-4 pb-4 pt-2 sm:px-7 sm:pb-5">
           <div className="mx-auto max-w-3xl"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div className="flex rounded-lg border border-line p-0.5">{([['chat', 'Ask tutor'], ['note', 'Create note'], ['session', 'Create session']] as const).map(([value, label]) => <button key={value} className={cn('inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium', mode === value ? 'bg-canvas text-accent' : 'text-muted')} aria-pressed={mode === value} disabled={loading} onClick={() => setMode(value)}>{value === 'note' && <FilePlus2 size={13} />}{value === 'session' && <CalendarPlus size={13} />}{label}</button>)}</div><span className="hidden text-[10px] text-muted sm:block">{mode === 'note' ? 'Saves to Notes & docs' : mode === 'session' ? 'Creates one calendar session' : 'Shortcuts: /note or /session'}</span></div>
           {mode === 'session' && <fieldset disabled={loading} className="mb-2 rounded-xl border border-line bg-canvas/50 p-3"><legend className="px-1 text-[10px] font-semibold text-muted">Optional details · override dates and times in your message</legend><div className="grid grid-cols-3 gap-2"><label className="text-[10px] text-muted">Date<input aria-label="Tutor session date" type="date" className="field mt-1 h-9 px-2 text-xs" value={sessionDate} onChange={event => setSessionDate(event.target.value)} /></label><label className="text-[10px] text-muted">Start time<input aria-label="Tutor session start time" type="time" className="field mt-1 h-9 px-2 text-xs" value={sessionTime} onChange={event => setSessionTime(event.target.value)} /></label><label className="text-[10px] text-muted">Minutes<input aria-label="Tutor session duration" type="number" min={5} max={480} placeholder="e.g. 45" className="field mt-1 h-9 px-2 text-xs" value={sessionMinutes} onChange={event => setSessionMinutes(event.target.value)} /></label></div><p className="mt-2 text-[9px] text-muted">Local time: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Include a title, date, time, and duration.</p></fieldset>}
-          <div className="flex items-end gap-2 rounded-2xl border border-line bg-surface p-2 shadow-float transition focus-within:border-accent/50 focus-within:ring-2 focus-within:ring-accent/10"><textarea ref={inputRef} rows={1} className="max-h-36 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 outline-none placeholder:text-muted/65" value={input} onChange={(event) => { setInput(event.target.value); event.target.style.height = 'auto'; event.target.style.height = `${Math.min(event.target.scrollHeight, 144)}px`; }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder={mode === 'note' ? "Describe the study note you want to create…" : mode === 'session' ? "Review biology tomorrow at 18:00 for 45 minutes…" : "Ask about your materials, or use /note or /session…"} maxLength={12000} aria-label="Message your study tutor" /><button onClick={() => send()} disabled={!input.trim() || loading} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-white transition hover:bg-accent-hover active:scale-95 disabled:opacity-30" aria-label="Send message">{loading ? <Spinner /> : <ArrowUp size={18} />}</button></div><p className="mt-2 text-center text-[9px] leading-4 text-muted">Enter to send · Shift + Enter for a new line · Verify important details with the cited sources.</p></div>
+          <div className="flex items-end gap-2 rounded-2xl border border-line bg-surface p-2 transition-colors focus-within:border-accent/50 focus-within:ring-2 focus-within:ring-accent/10"><textarea ref={inputRef} rows={1} className="tutor-message-input min-w-0 max-h-36 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 outline-none placeholder:text-muted/65" value={input} onChange={(event) => { setInput(event.target.value); event.target.style.height = 'auto'; event.target.style.height = `${Math.min(event.target.scrollHeight, 144)}px`; }} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder={mode === 'note' ? "Describe the study note you want to create…" : mode === 'session' ? "Review biology tomorrow at 18:00 for 45 minutes…" : "Ask about your materials, or use /note or /session…"} maxLength={12000} aria-label="Message your study tutor" /><button onClick={() => send()} disabled={!input.trim() || loading} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-white transition hover:bg-accent-hover active:scale-95 disabled:opacity-30" aria-label="Send message">{loading ? <Spinner /> : <ArrowUp size={18} />}</button></div><p className="mt-2 text-center text-[9px] leading-4 text-muted">Enter to send · Shift + Enter for a new line · Verify important details with the cited sources.</p></div>
         </div>
       </section>
     </div>

@@ -116,3 +116,24 @@ def test_nested_parent_ownership(client, auth_headers):
     assert client.post('/api/folders', headers=headers, json={'name': 'Nested', 'parent_id': folder}).status_code == 404
     assert client.patch(f'/api/folders/{child}', headers=headers, json={'parent_id': folder}).status_code == 404
     assert client.patch(f'/api/folders/{folder}', headers=headers, json={'parent_id': child}).status_code == 404
+
+
+def test_tutor_subject_scope_includes_children_and_excludes_other_subjects(client, auth_headers, monkeypatch):
+    from app.routers import ai
+    subject = client.post('/api/folders', headers=auth_headers, json={'name': 'Biology'}).json()['id']
+    child = client.post('/api/folders', headers=auth_headers, json={'name': 'Cells', 'parent_id': subject}).json()['id']
+    expected = {upload(client, auth_headers, subject).json()['id'], upload(client, auth_headers, child).json()['id']}
+    upload(client, auth_headers)
+    captured = []
+
+    async def answer(db, user_id, message, history, document_ids):
+        captured.extend(document_ids)
+        return 'Scoped answer', [], 'local'
+
+    monkeypatch.setattr(ai, 'answer_question', answer)
+    response = client.post('/api/ai/chat', headers=auth_headers, json={'message': 'Explain cells', 'subject_id': subject})
+    assert response.status_code == 200
+    assert set(captured) == expected
+    empty = client.post('/api/folders', headers=auth_headers, json={'name': 'Empty'}).json()['id']
+    assert client.post('/api/ai/chat', headers=auth_headers, json={'message': 'Explain cells', 'subject_id': empty}).status_code == 400
+    assert client.post('/api/ai/chat', headers=auth_headers, json={'message': 'Explain cells', 'subject_id': 999999}).status_code == 404

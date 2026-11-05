@@ -233,6 +233,7 @@ class ChatRequest(BaseModel):
     timezone: str = Field(default="local time", max_length=80)
     create_note: bool = False
     message: str = Field(min_length=1, max_length=12_000)
+    subject_id: int | None = Field(default=None, gt=0)
     conversation_id: int | None = None
     document_ids: list[int] = Field(default_factory=list, max_length=20)
 

@@ -4,6 +4,12 @@ import type { SubjectFolder } from '../types';
 import { cn } from '../lib/utils';
 
 export type FolderSelection = number | 'root' | 'unfiled';
+const folderColors = ['bg-emerald-500', 'bg-sky-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-teal-500', 'bg-indigo-500', 'bg-orange-500'];
+
+export function FolderDot({ id }: { id: number | null }) {
+  return <span aria-hidden="true" className={cn('inline-block h-2 w-2 shrink-0 rounded-full', id === null ? 'bg-slate-400' : folderColors[id % folderColors.length])} />;
+}
+
 export function folderTrail(folders: SubjectFolder[], id: number | null): SubjectFolder[] {
   const byId = new Map(folders.map(folder => [folder.id, folder]));
   const trail: SubjectFolder[] = [];
@@ -60,15 +66,15 @@ export function FolderTree({ folders, selected, onSelect, showRoot = true, rootL
     }
   }
   return <div className="flex min-h-0 flex-1 flex-col">
-    <div className="relative m-3"><Search size={14} className="absolute left-3 top-3 text-muted" /><input aria-label="Find a folder" className="field h-10 pl-8 pr-8 text-xs" placeholder="Find a folder…" value={query} onChange={event => setQuery(event.target.value)} />{query && <button className="icon-btn absolute right-1 top-1 h-8 w-7" aria-label="Clear folder search" onClick={() => setQuery('')}><X size={13} /></button>}</div>
-    <nav aria-label="Folder navigation" className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-      {showRoot && <button className={cn('mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium', selected === 'root' ? 'bg-accent-soft text-accent-dark dark:bg-accent-dark dark:text-white' : 'text-muted hover:bg-canvas')} onClick={() => onSelect('root')}><FolderOpen size={15} />Folders</button>}
-      <button className={cn('mb-2 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium', selected === 'unfiled' ? 'bg-accent-soft text-accent-dark dark:bg-accent-dark dark:text-white' : 'text-muted hover:bg-canvas')} onClick={() => onSelect('unfiled')}><Folder size={15} />{rootLabel}</button>
+    <div className="relative m-3"><Search size={14} className="absolute left-3 top-3 text-muted" /><input aria-label="Find a subject" className="field h-10 pl-8 pr-8 text-xs" placeholder="Find a subject…" value={query} onChange={event => setQuery(event.target.value)} />{query && <button type="button" className="icon-btn absolute right-1 top-1 h-8 w-7" aria-label="Clear subject search" onClick={() => setQuery('')}><X size={13} /></button>}</div>
+    <nav aria-label="Subject navigation" className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+      {showRoot && <button type="button" className={cn('mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium', selected === 'root' ? 'bg-accent-soft text-accent-dark dark:bg-accent-dark dark:text-white' : 'text-muted hover:bg-canvas')} onClick={() => onSelect('root')}><FolderOpen size={15} />Subjects</button>}
+      <button type="button" className={cn('mb-2 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium', selected === 'unfiled' ? 'bg-accent-soft text-accent-dark dark:bg-accent-dark dark:text-white' : 'text-muted hover:bg-canvas')} title={rootLabel === 'Unfiled' ? 'Files without an assigned subject' : rootLabel} onClick={() => onSelect('unfiled')}><FolderDot id={null} /><Folder size={15} />{rootLabel}</button>
       {rows.map(({ folder, depth }) => <div key={folder.id} className={cn('mb-0.5 flex items-center rounded-lg', selected === folder.id ? 'bg-accent-soft text-accent-dark dark:bg-accent-dark dark:text-white' : 'text-muted hover:bg-canvas')} style={{ paddingLeft: Math.min(depth, 12) * 14 }}>
-        <button className="icon-btn h-8 w-7" disabled={!children.has(folder.id) || !!query} aria-label={`${expanded.has(folder.id) ? 'Collapse' : 'Expand'} ${folder.name}`} aria-expanded={expanded.has(folder.id)} onClick={() => setExpanded(current => { const next = new Set(current); if (next.has(folder.id)) next.delete(folder.id); else next.add(folder.id); return next; })}>{children.has(folder.id) ? expanded.has(folder.id) ? <ChevronDown size={13} /> : <ChevronRight size={13} /> : <span className="h-1 w-1 rounded-full bg-muted/40" />}</button>
-        <button className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-2 text-left text-xs" title={folderPath(folders, folder)} aria-current={selected === folder.id ? 'location' : undefined} onClick={() => onSelect(folder.id)}><Folder size={14} className="shrink-0" /><span className="min-w-0"><span className="block truncate">{folder.name}</span>{query && <span className="mt-1 block truncate text-[10px] opacity-60">{folderPath(folders, folder)}</span>}</span></button>
+        <button type="button" className="icon-btn h-8 w-7" disabled={!children.has(folder.id) || !!query} aria-label={`${expanded.has(folder.id) ? 'Collapse' : 'Expand'} ${folder.name}`} aria-expanded={expanded.has(folder.id)} onClick={() => setExpanded(current => { const next = new Set(current); if (next.has(folder.id)) next.delete(folder.id); else next.add(folder.id); return next; })}>{children.has(folder.id) ? expanded.has(folder.id) ? <ChevronDown size={13} /> : <ChevronRight size={13} /> : <span className="h-1 w-1 rounded-full bg-muted/40" />}</button>
+        <button type="button" className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-2 text-left text-xs" title={folderPath(folders, folder)} aria-current={selected === folder.id ? 'location' : undefined} onClick={() => onSelect(folder.id)}><FolderDot id={folder.id} /><Folder size={14} className="shrink-0" /><span className="min-w-0"><span className="block truncate">{folder.name}</span>{query && <span className="mt-1 block truncate text-[10px] opacity-60">{folderPath(folders, folder)}</span>}</span></button>
       </div>)}
-      {query && !rows.length && <p className="p-4 text-center text-xs text-muted">No matching folders</p>}
+      {query && !rows.length && <p className="p-4 text-center text-xs text-muted">No matching subjects</p>}
     </nav>
   </div>;
 }
@@ -77,7 +83,7 @@ export default function FolderBrowser({ folders, selected, onSelect, onNew }: {
   folders: SubjectFolder[]; selected: FolderSelection; onSelect: (value: FolderSelection) => void; onNew: () => void;
 }) {
   return <aside className="flex h-full min-h-0 flex-col border-r border-line bg-sidebar">
-    <div className="flex h-14 shrink-0 items-center justify-between border-b border-line px-4"><h2 className="text-xs font-semibold uppercase tracking-wider text-muted">Folders <span className="ml-1 opacity-60">{folders.length}</span></h2><button className="icon-btn h-8 w-8" aria-label="New root folder" onClick={onNew}><FolderPlus size={16} /></button></div>
+    <div className="flex h-14 shrink-0 items-center justify-between border-b border-line px-4"><h2 className="text-xs font-semibold uppercase tracking-wider text-muted">Subjects <span className="ml-1 opacity-60">{folders.length}</span></h2><button type="button" className="icon-btn h-8 w-8" aria-label="New root subject" onClick={onNew}><FolderPlus size={16} /></button></div>
     <FolderTree folders={folders} selected={selected} onSelect={onSelect} />
   </aside>;
 }

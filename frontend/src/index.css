@@ -78,3 +78,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 .markdown-body .katex { font-size: 1.08em; }
 .markdown-body .katex-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: .35rem 0; }
+
+/* The composer provides a rounded focus indicator around the entire input. */
+.tutor-message-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}

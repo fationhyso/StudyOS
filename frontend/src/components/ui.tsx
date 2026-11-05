@@ -47,13 +47,15 @@ export function Button({ variant = 'primary', loading, icon, className, children
 
 export function Modal({ title, description, onClose, children, wide = false }: { title: string; description?: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   const panel = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const oldOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const timer = window.setTimeout(() => panel.current?.querySelector<HTMLElement>('input, textarea, select, button')?.focus(), 30);
+    const timer = window.setTimeout(() => panel.current?.querySelector<HTMLElement>('input[autofocus], textarea[autofocus], input, textarea, select, button')?.focus(), 30);
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') closeRef.current();
       if (event.key === 'Tab' && panel.current) {
         const focusable = Array.from(panel.current.querySelectorAll<HTMLElement>('button, input, textarea, select, a[href], [tabindex="0"]')).filter((element) => !element.hasAttribute('disabled'));
         if (!focusable.length) return;
@@ -70,7 +72,7 @@ export function Modal({ title, description, onClose, children, wide = false }: {
       document.removeEventListener('keydown', onKey);
       previous?.focus();
     };
-  }, [onClose]);
+  }, []);
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-0 backdrop-blur-[3px] animate-fade-in sm:items-center sm:p-5" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div ref={panel} role="dialog" aria-modal="true" aria-labelledby="modal-title" className={cn('max-h-[92vh] w-full overflow-y-auto rounded-t-3xl border border-line bg-surface shadow-float animate-slide-up sm:rounded-2xl', wide ? 'max-w-2xl' : 'max-w-lg')}>

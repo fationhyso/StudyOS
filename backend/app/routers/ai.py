@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from ..config import get_settings
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import ChatMessage, Conversation, Document, Note, StudySession, User, utcnow
+from ..models import ChatMessage, Conversation, Document, Note, StudySession, SubjectFolder, User, utcnow
 from ..rate_limit import enforce_rate_limit
 from ..schemas import ChatRequest, ChatResponse, ConversationOut, MessageOut, NoteOut, StudySessionOut
 from ..services.ai import answer_question
@@ -91,6 +91,25 @@ async def chat(
         ).all())
         if count != len(set(payload.document_ids)):
             raise HTTPException(status_code=400, detail="One or more selected documents are unavailable")
+
+    if payload.subject_id is not None:
+        subjects = db.scalars(select(SubjectFolder).where(SubjectFolder.user_id == user.id)).all()
+        if not any(subject.id == payload.subject_id for subject in subjects):
+            raise HTTPException(404, "Subject not found")
+        subject_ids = {payload.subject_id}
+        while True:
+            children = {subject.id for subject in subjects if subject.parent_id in subject_ids}
+            if children <= subject_ids:
+                break
+            subject_ids.update(children)
+        document_ids = list(db.scalars(select(Document.id).where(
+            Document.user_id == user.id, Document.folder_id.in_(subject_ids), Document.status == "ready"
+        )).all())
+        if payload.document_ids:
+            document_ids = list(set(document_ids).intersection(payload.document_ids))
+        if not document_ids:
+            raise HTTPException(400, "This subject has no ready study materials. Upload a file to this subject first.")
+        payload.document_ids = document_ids
 
     if payload.conversation_id:
         conversation = owned_conversation(payload.conversation_id, user, db)
