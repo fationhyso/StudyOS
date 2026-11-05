@@ -5,6 +5,8 @@ import {
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
+import ExamCountdown from '../components/ExamCountdown';
+import SemesterCourses from '../components/SemesterCourses';
 import { Button, EmptyState, Skeleton } from '../components/ui';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -79,6 +81,9 @@ export default function Dashboard() {
           <Link to="/tutor" className="hidden sm:block"><Button icon={<Sparkles size={16} />}>Study with AI</Button></Link>
         </div>
       </section>
+
+      {user && <ExamCountdown key={user.id} userId={user.id} />}
+      {user && <SemesterCourses key={user.id} userId={user.id} />}
 
       <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard label="Focused this week" value={formatMinutes(stats.completed_minutes)} detail={`of ${formatMinutes(stats.planned_minutes)} planned`} icon={<Clock3 size={16} />} tone="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" />

@@ -3,7 +3,7 @@ import { useRef, useState, type KeyboardEvent } from 'react';
 import { addDays, addMonths, format, isSameMonth, isValid, parseISO, startOfMonth, startOfWeek } from 'date-fns';
 import { cn, localDateString } from '../lib/utils';
 
-export default function SessionDatePicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export default function SessionDatePicker({ value, onChange, id = 'session-date' }: { value: string; onChange: (value: string) => void; id?: string }) {
   const selected = isValid(parseISO(value)) ? parseISO(value) : new Date();
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => startOfMonth(selected));
@@ -23,10 +23,10 @@ export default function SessionDatePicker({ value, onChange }: { value: string; 
     if (event.key === 'PageUp' || event.key === 'PageDown') { event.preventDefault(); focusDay(addMonths(day, event.key === 'PageUp' ? -1 : 1)); }
   };
   return <div onKeyDown={event => { if (open && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } }}>
-    <button ref={trigger} id="session-date" type="button" aria-expanded={open} aria-controls="session-calendar" onClick={() => { setMonth(startOfMonth(selected)); setOpen(current => !current); if (!open) requestAnimationFrame(() => calendar.current?.querySelector<HTMLButtonElement>(`[data-day="${value}"]`)?.focus()); }} className="flex h-11 w-full items-center gap-2 rounded-xl border border-line bg-surface px-3 text-left text-sm transition hover:border-accent/50">
+    <button ref={trigger} id={id} type="button" aria-expanded={open} aria-controls={`${id}-calendar`} onClick={() => { setMonth(startOfMonth(selected)); setOpen(current => !current); if (!open) requestAnimationFrame(() => calendar.current?.querySelector<HTMLButtonElement>(`[data-day="${value}"]`)?.focus()); }} className="flex h-11 w-full items-center gap-2 rounded-xl border border-line bg-surface px-3 text-left text-sm transition hover:border-accent/50">
       <CalendarDays size={16} className="shrink-0 text-accent" /><span className="min-w-0 flex-1 truncate">{format(selected, 'EEE, d MMM yyyy')}</span><ChevronDown size={14} className={cn('shrink-0 text-muted transition', open && 'rotate-180')} />
     </button>
-    {open && <div ref={calendar} id="session-calendar" role="group" aria-label="Choose study date" className="mt-2 rounded-xl border border-line bg-surface p-2">
+    {open && <div ref={calendar} id={`${id}-calendar`} role="group" aria-label="Choose date" className="mt-2 rounded-xl border border-line bg-surface p-2">
       <div className="mb-2 flex items-center justify-between"><button type="button" className="icon-btn h-8 w-8" aria-label="Previous month" onClick={() => setMonth(current => addMonths(current, -1))}><ChevronLeft size={15} /></button><span aria-live="polite" className="text-xs font-semibold">{format(month, 'MMMM yyyy')}</span><button type="button" className="icon-btn h-8 w-8" aria-label="Next month" onClick={() => setMonth(current => addMonths(current, 1))}><ChevronRight size={15} /></button></div>
       <div className="grid grid-cols-7 gap-0.5">{['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(day => <span key={day} aria-hidden="true" className="py-1 text-center text-[10px] text-muted">{day}</span>)}
         {Array.from({ length: 42 }, (_, index) => addDays(first, index)).map(day => {
