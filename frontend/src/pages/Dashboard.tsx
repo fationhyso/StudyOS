@@ -53,8 +53,8 @@ export default function Dashboard() {
   const maxMinutes = Math.max(60, ...data.weekly.map((day) => day.planned));
 
   return (
-    <div className="mx-auto max-w-[1440px] p-5 sm:p-7 lg:p-8">
-      <section className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+    <div className="mx-auto max-w-[1440px] px-5 py-3 sm:px-7 sm:py-4 lg:px-8 lg:py-5">
+      <section className="mb-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="mb-1.5 text-xs font-medium text-accent">{format(new Date(), 'EEEE, MMMM d')}</p>
           <h2 className="text-[28px] font-semibold tracking-[-.045em] sm:text-[32px]">{greeting()}, {user?.name.split(' ')[0]}.</h2>
