@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --canvas: 247 248 246;
+  --surface: 255 255 255;
+  --sidebar: 243 244 241;
+  --ink: 32 35 31;
+  --muted: 116 121 113;
+  --line: 228 230 225;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+.dark {
+  --canvas: 18 20 17;
+  --surface: 27 29 25;
+  --sidebar: 22 24 21;
+  --ink: 232 234 229;
+  --muted: 151 157 147;
+  --line: 53 56 49;
+}
+
+* { border-color: rgb(var(--line)); }
+html { scroll-behavior: smooth; }
+body { @apply m-0 min-w-[320px] bg-canvas font-sans text-ink antialiased; }
+button, input, textarea, select { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  @apply outline-none ring-2 ring-accent/50 ring-offset-2 ring-offset-surface;
+}
+::selection { @apply bg-accent/20 text-ink; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { @apply rounded-full bg-line; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--muted) / .45); }
+
+@layer components {
+  .card { @apply rounded-2xl border border-line bg-surface shadow-soft; }
+  .field { @apply w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted/70 transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15; }
+  .icon-btn { @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-canvas hover:text-ink active:scale-95 disabled:pointer-events-none disabled:opacity-40; }
+  .label { @apply mb-1.5 block text-xs font-semibold text-ink; }
+  .subtle-scrollbar { scrollbar-width: thin; }
+}
+
+.markdown-body { @apply text-[15px] leading-7 text-ink; overflow-wrap: anywhere; }
+.markdown-body > *:first-child { margin-top: 0; }
+.markdown-body > *:last-child { margin-bottom: 0; }
+.markdown-body h1 { @apply mb-4 mt-7 text-3xl font-bold tracking-tight; }
+.markdown-body h2 { @apply mb-3 mt-6 text-2xl font-semibold tracking-tight; }
+.markdown-body h3 { @apply mb-2 mt-5 text-xl font-semibold; }
+.markdown-body p { @apply my-3; }
+.markdown-body ul { @apply my-3 list-disc space-y-1 pl-6; }
+.markdown-body ol { @apply my-3 list-decimal space-y-1 pl-6; }
+.markdown-body blockquote { @apply my-4 border-l-2 border-accent pl-4 italic text-muted; }
+.markdown-body a { @apply text-accent underline underline-offset-2; }
+.markdown-body code { @apply rounded bg-canvas px-1.5 py-0.5 font-mono text-[0.85em]; }
+.markdown-body pre { @apply my-4 overflow-auto rounded-xl bg-canvas p-4; }
+.markdown-body pre code { @apply bg-transparent p-0; }
+.markdown-body table { @apply my-4 w-full border-collapse text-sm; }
+.markdown-body th, .markdown-body td { @apply border border-line p-2 text-left; }
+.markdown-body hr { @apply my-6; }
+.markdown-body mark, .pdf-highlight { @apply rounded-sm bg-yellow-200/80 px-0.5 text-inherit dark:bg-yellow-500/50; }
+
+.react-pdf__Page { @apply overflow-hidden rounded-sm shadow-float; background: white; }
+.react-pdf__Page__textContent { @apply select-text; }
+.react-pdf__Page__annotations { display: none; }
+.pdf-page-loading { @apply flex h-32 w-full items-center justify-center text-sm text-muted; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
