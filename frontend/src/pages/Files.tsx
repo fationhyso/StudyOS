@@ -250,22 +250,19 @@ export default function Files() {
       {folderPanelOpen && <button className="fixed inset-0 z-20 bg-black/30 lg:hidden" aria-label="Close subjects" onClick={() => setFolderPanelOpen(false)} />}
       <div className={cn('shrink-0 lg:static lg:z-auto lg:block lg:w-64', folderPanelOpen ? 'fixed inset-y-0 left-0 z-30 w-72 shadow-float' : 'hidden')}><FolderBrowser folders={folders} selected={activeFolder} onSelect={value => { setActiveFolder(value); setFolderPanelOpen(false); }} onNew={() => openFolderDialog('new')} onDropFiles={dropFiles} canDropFiles={() => !moveBusy && dragIds.current.length > 0} /></div>
       <div className="min-w-0 flex-1 overflow-y-auto"><div className="mx-auto max-w-[1440px] px-4 py-3 sm:px-6 sm:py-4 lg:px-7">
-      <section className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+      <section className="mb-2">
         <div><button className="mb-3 inline-flex items-center gap-2 text-xs font-medium text-accent lg:hidden" onClick={() => setFolderPanelOpen(true)}><PanelLeft size={16} />Browse subjects</button><h2 className="flex items-center gap-2 text-2xl font-semibold tracking-[-.04em]">{currentFolder && <FolderDot id={currentFolder.id} />}{currentFolder?.name || (activeFolder === 'unfiled' ? 'Unfiled' : 'Your study library')}</h2><p className="mt-1.5 text-sm text-muted">Everything you need, searchable and ready for your tutor.</p></div>
-        <Button onClick={() => fileInput.current?.click()} icon={<UploadCloud size={16} />}>Upload files</Button>
         <input ref={fileInput} type="file" className="hidden" accept={accepted} multiple onChange={(event) => { uploadFiles(Array.from(event.target.files || [])); event.target.value = ''; }} />
       </section>
 
-      <section className="mb-3">
+      <section className="mb-1">
         <nav aria-label="Subject breadcrumb" className="mb-2 flex flex-wrap items-center gap-1 text-xs text-muted"><button className="rounded px-1 py-1 hover:text-accent" onClick={() => setActiveFolder('root')}>Library</button>{trail.map(folder => <span key={folder.id} className="flex min-w-0 items-center gap-1"><ChevronRight size={12} /><button className="inline-flex max-w-48 items-center gap-1.5 rounded px-1 py-1 hover:text-accent" onClick={() => setActiveFolder(folder.id)}><FolderDot id={folder.id} /><span className="truncate">{folder.name}</span></button></span>)}{activeFolder === 'unfiled' && <span>/ Unfiled</span>}</nav>
         <div className="mb-2 flex items-center gap-1">
           <button className="icon-btn h-8 w-8" title={currentFolder ? 'New subsubject' : 'New subject'} aria-label={currentFolder ? 'New subsubject' : 'New subject'} onClick={() => openFolderDialog('new', typeof activeFolder === 'number' ? activeFolder : null)}><FolderPlus size={16} /></button>
           {currentFolder && <><button className="icon-btn h-8 w-8" title="Edit subject" aria-label="Edit subject" onClick={() => openFolderDialog(currentFolder)}><Pencil size={15} /></button><button className="icon-btn h-8 w-8 hover:text-red-600" title="Delete subject" aria-label="Delete subject" onClick={() => setFolderDelete(currentFolder)}><Trash2 size={15} /></button></>}
         </div>
-        <p className="mt-2 text-xs text-muted">{currentFolder ? 'Showing subsubjects and files together. New uploads are saved here.' : activeFolder === 'unfiled' ? 'Files without an assigned subject. Uploads made from the library appear here; use the move icon on a file to organize it.' : 'Choose a subject to see its files, or open Unfiled. Files are shown within their subjects.'}</p>
       </section>
 
-      <p className="mb-3 text-[11px] text-muted">PDF, text, images & Office documents · Up to 25 MB each</p>
       {uploading.length > 0 && <div role="status" className="mb-3 flex items-center gap-2 text-xs text-muted"><Spinner />Uploading {uploading.length} {uploading.length === 1 ? 'file' : 'files'}… <span className="truncate">{uploading[0]}</span></div>}
       <section className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative flex-1 sm:max-w-xs"><Search size={15} className="absolute left-3 top-3 text-muted" /><input className="field h-10 pl-9 pr-8" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your library…" />{query && <button className="icon-btn absolute right-0.5 top-0.5 h-9 w-9" onClick={() => setQuery('')}><X size={14} /></button>}</div>
