@@ -1,29 +1,22 @@
 import { BookOpen, Pencil, Plus } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
+import { usePreference } from '../lib/preferences';
 import { useToast } from '../context/ToastContext';
 import { Button, Modal } from './ui';
 
 type Semester = { name: string; courses: string[] };
-function readSemester(key: string): Semester {
-  try {
-    const value = JSON.parse(localStorage.getItem(key) || 'null');
-    if (value && typeof value.name === 'string' && Array.isArray(value.courses)) return { name: value.name, courses: value.courses.filter((course: unknown): course is string => typeof course === 'string' && !!course.trim()) };
-  } catch { /* New users see the setup prompt. */ }
+function parseSemester(value: unknown): Semester {
+  const item = value as Partial<Semester> | null;
+  if (item && typeof item.name === 'string' && Array.isArray(item.courses)) return { name: item.name, courses: item.courses.filter((course: unknown): course is string => typeof course === 'string' && !!course.trim()) };
   return { name: '', courses: [] };
 }
 
 export default function SemesterCourses({ userId }: { userId: number }) {
-  const key = `studyos.semester-courses.${userId}`;
   const { toast } = useToast();
-  const [semester, setSemester] = useState(() => readSemester(key));
+  const [semester, saveSemester] = usePreference(userId, 'semester-courses', parseSemester);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
   const [courseText, setCourseText] = useState('');
-  useEffect(() => {
-    const sync = () => setSemester(readSemester(key));
-    window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
-  }, [key]);
   const openSetup = () => { setName(semester.name); setCourseText(semester.courses.join('\n')); setEditing(true); };
   const save = (event: FormEvent) => {
     event.preventDefault();
@@ -34,8 +27,8 @@ export default function SemesterCourses({ userId }: { userId: number }) {
     });
     if (!name.trim()) return;
     const next = { name: name.trim(), courses };
-    try { localStorage.setItem(key, JSON.stringify(next)); setSemester(next); setEditing(false); }
-    catch { toast('Could not save your semester in this browser', 'error'); }
+    setEditing(false);
+    saveSemester(next).catch(() => toast('Could not sync your semester to your account', 'error'));
   };
   return <>
     <section aria-label="This semester’s courses" className="card overflow-hidden">
@@ -46,7 +39,7 @@ export default function SemesterCourses({ userId }: { userId: number }) {
       <form onSubmit={save} className="space-y-4">
         <div><label className="label" htmlFor="semester-name">Semester name</label><input id="semester-name" autoFocus className="field" placeholder="e.g. Fall 2026" maxLength={80} required value={name} onChange={event => setName(event.target.value)} /></div>
         <div><label className="label" htmlFor="semester-courses">Courses</label><textarea id="semester-courses" className="field min-h-56 resize-y text-sm leading-7" placeholder={'Organic Chemistry\nCalculus II\nIntroduction to Psychology'} maxLength={10000} value={courseText} onChange={event => setCourseText(event.target.value)} aria-describedby="semester-courses-help" /><p id="semester-courses-help" className="mt-2 text-xs text-muted">One course per line. Edit or remove any line to update your list.</p></div>
-        <p className="text-[11px] text-muted">Saved in this browser for your account.</p>
+        <p className="text-[11px] text-muted">Saved to your account and synced across devices.</p>
         <div className="flex justify-end gap-2 border-t border-line pt-4"><Button type="button" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button><Button type="submit" disabled={!name.trim()}>Save courses</Button></div>
       </form>
     </Modal>}

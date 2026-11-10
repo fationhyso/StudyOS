@@ -41,12 +41,12 @@ export default function ExamCountdown({ userId }: { userId: number }) {
     if (!name.trim() || !isValid(parseISO(date)) || date < localDateString()) { toast('Choose an exam name and a date from today onward', 'error'); return; }
     const exam = { id: editingId ?? crypto.randomUUID(), name: name.trim(), date };
     const next = editingId ? exams.map(item => item.id === editingId ? exam : item) : [...exams, exam];
-    try { saveExams(next); setEditing(false); }
-    catch { toast('Could not save your countdown in this browser', 'error'); }
+    setEditing(false);
+    saveExams(next).catch(() => toast('Could not sync your countdown to your account', 'error'));
   };
   const remove = () => {
-    try { const next = exams.filter(exam => exam.id !== editingId); saveExams(next); setEditing(false); }
-    catch { toast('Could not remove your countdown', 'error'); }
+    setEditing(false);
+    saveExams(exams.filter(exam => exam.id !== editingId)).catch(() => toast('Could not remove your countdown', 'error'));
   };
   const sortedExams = [...exams].sort((a, b) => Number(a.date < today) - Number(b.date < today) || a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
   const daysLeft = startDate ? differenceInCalendarDays(parseISO(startDate), parseISO(today)) : null;
@@ -57,7 +57,7 @@ export default function ExamCountdown({ userId }: { userId: number }) {
       {startDate ? <button className="mt-1 block w-full text-left" onClick={openPeriod} title="Edit exam period start date"><span className="block text-2xl font-semibold tracking-[-.04em]">{daysLeft! < 0 ? 'Started' : daysLeft === 0 ? 'Today' : `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}`}</span><span className="mt-1 block text-[11px] text-muted">{daysLeft! > 0 ? 'Starts' : 'Started'} {format(parseISO(startDate), 'd MMM yyyy')}</span></button> : <button className="mt-2 text-left text-xs font-medium text-accent hover:underline" onClick={openPeriod}>Set exam period start date</button>}
       <button className="mt-2 text-[11px] font-medium text-accent hover:underline" onClick={() => setManaging(true)}>Individual exams ({exams.length})</button>
     </section>
-    {periodEditing && <Modal title="Exam period start date" description="Count down to the first day of your exam period." onClose={() => setPeriodEditing(false)}><form className="space-y-4" onSubmit={event => { event.preventDefault(); if (!isValid(parseISO(periodDate))) return; try { saveStartDate(periodDate); setPeriodEditing(false); } catch { toast('Could not save your exam period', 'error'); } }}><div><label className="label" htmlFor="period-date">Starting day</label><SessionDatePicker id="period-date" value={periodDate} onChange={setPeriodDate} /><p className="mt-2 text-[11px] text-muted">Saved in this browser for your account.</p></div><div className="flex justify-between gap-2"><div>{startDate && <Button type="button" variant="ghost" onClick={() => { try { saveStartDate(null); setPeriodEditing(false); } catch { toast('Could not remove your exam period', 'error'); } }}>Remove</Button>}</div><div className="flex gap-2"><Button type="button" variant="ghost" onClick={() => setPeriodEditing(false)}>Cancel</Button><Button type="submit">Save start date</Button></div></div></form></Modal>}
+    {periodEditing && <Modal title="Exam period start date" description="Count down to the first day of your exam period." onClose={() => setPeriodEditing(false)}><form className="space-y-4" onSubmit={event => { event.preventDefault(); if (!isValid(parseISO(periodDate))) return; setPeriodEditing(false); saveStartDate(periodDate).catch(() => toast('Could not save your exam period', 'error')); }}><div><label className="label" htmlFor="period-date">Starting day</label><SessionDatePicker id="period-date" value={periodDate} onChange={setPeriodDate} /><p className="mt-2 text-[11px] text-muted">Saved to your account and synced across devices.</p></div><div className="flex justify-between gap-2"><div>{startDate && <Button type="button" variant="ghost" onClick={() => { setPeriodEditing(false); saveStartDate(null).catch(() => toast('Could not remove your exam period', 'error')); }}>Remove</Button>}</div><div className="flex gap-2"><Button type="button" variant="ghost" onClick={() => setPeriodEditing(false)}>Cancel</Button><Button type="submit">Save start date</Button></div></div></form></Modal>}
     {managing && <Modal title="Your exams" description="Upcoming exams appear first." onClose={() => setManaging(false)}>
       <div className="mb-3 flex justify-end"><Button variant="secondary" className="h-9 px-3 text-xs" onClick={() => openSetup()} icon={<Plus size={15} />}>Add exam</Button></div>
       {sortedExams.length > 0 && <div className="max-h-80 divide-y divide-line overflow-y-auto border-t border-line">{sortedExams.map(exam => {
@@ -73,7 +73,7 @@ export default function ExamCountdown({ userId }: { userId: number }) {
     {editing && <Modal title={editingId ? 'Edit exam countdown' : 'Add an exam'} description="Add the exam you’re working toward." onClose={() => setEditing(false)}>
       <form onSubmit={save} className="space-y-4">
         <div><label className="label" htmlFor="exam-name">Exam name</label><input id="exam-name" autoFocus className="field" placeholder="e.g. Biology final" value={name} onChange={event => setName(event.target.value)} required maxLength={120} /></div>
-        <div><label className="label" htmlFor="exam-date">Exam date</label><SessionDatePicker id="exam-date" value={date} onChange={setDate} /><p className="mt-2 text-[11px] text-muted">Saved in this browser for your account.</p></div>
+        <div><label className="label" htmlFor="exam-date">Exam date</label><SessionDatePicker id="exam-date" value={date} onChange={setDate} /><p className="mt-2 text-[11px] text-muted">Saved to your account and synced across devices.</p></div>
         <div className="flex items-center justify-between gap-2 border-t border-line pt-4"><div>{editingId && <button type="button" className="icon-btn hover:text-red-600" aria-label="Remove exam countdown" title="Remove countdown" onClick={remove}><Trash2 size={15} /></button>}</div><div className="flex gap-2"><Button type="button" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button><Button type="submit" disabled={!name.trim() || date < today}>Save countdown</Button></div></div>
       </form>
     </Modal>}

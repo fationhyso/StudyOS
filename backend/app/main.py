@@ -11,7 +11,7 @@ from .config import get_settings
 from .database import Base, SessionLocal, engine
 from .models import Document
 from .migrations import upgrade_subject_folders, upgrade_ai_notes, upgrade_tutor_sessions
-from .routers import ai, auth, dashboard, documents, notes, schedule, integrations, folders
+from .routers import ai, auth, dashboard, documents, notes, schedule, integrations, folders, preferences
 from .services.documents import process_document
 
 settings = get_settings()
@@ -68,6 +68,7 @@ app.include_router(notes.router)
 app.include_router(schedule.router)
 app.include_router(ai.router)
 app.include_router(dashboard.router)
+app.include_router(preferences.router)
 
 
 @app.get("/api/health", tags=["system"])
