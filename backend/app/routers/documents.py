@@ -26,6 +26,7 @@ SAFE_MIME_TYPES = {
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".odt": "application/vnd.oasis.opendocument.text",
     ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
@@ -72,7 +73,7 @@ async def upload_document(
     original_name = Path(file.filename or "Untitled").name.strip()[:255]
     extension = Path(original_name).suffix.lower()
     if extension not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=415, detail="Supported files: PDF, TXT, MD, images, DOCX, PPTX, and XLSX")
+        raise HTTPException(status_code=415, detail="Supported files: PDF, TXT, MD, images, DOCX, ODT, PPTX, and XLSX")
 
     stored_name = f"{uuid.uuid4().hex}{extension}"
     destination = settings.upload_dir / stored_name

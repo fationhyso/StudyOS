@@ -1,6 +1,7 @@
 import logging
 import re
 from pathlib import Path
+from xml.etree import ElementTree
 from zipfile import ZipFile
 
 import pytesseract
@@ -25,13 +26,61 @@ ALLOWED_EXTENSIONS = {
     ".jpeg",
     ".webp",
     ".docx",
+    ".odt",
     ".pptx",
     ".xlsx",
 }
 
 
+ODF_TEXT = "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}"
+ODF_TABLE = "{urn:oasis:names:tc:opendocument:xmlns:table:1.0}"
+
+
+def _odf_inline_text(element: ElementTree.Element) -> str:
+    """Text of one paragraph, keeping ODF's encoded spaces, tabs and line breaks."""
+    parts = [element.text or ""]
+    for child in element:
+        if child.tag == f"{ODF_TEXT}s":
+            parts.append(" " * int(child.get(f"{ODF_TEXT}c", "1")))
+        elif child.tag == f"{ODF_TEXT}tab":
+            parts.append("\t")
+        elif child.tag == f"{ODF_TEXT}line-break":
+            parts.append("\n")
+        elif child.tag != f"{ODF_TEXT}note":  # footnote bodies would interrupt the sentence
+            parts.append(_odf_inline_text(child))
+        parts.append(child.tail or "")
+    return "".join(parts)
+
+
+def _odf_blocks(element: ElementTree.Element, out: list[str]) -> None:
+    for child in element:
+        if child.tag in {f"{ODF_TEXT}p", f"{ODF_TEXT}h"}:
+            text = _odf_inline_text(child)
+            if text.strip():
+                out.append(text)
+        elif child.tag == f"{ODF_TABLE}table-row":
+            cells = []
+            for cell in child.iter(f"{ODF_TABLE}table-cell"):
+                lines: list[str] = []
+                _odf_blocks(cell, lines)
+                cells.append(" ".join(lines))
+            if any(cell.strip() for cell in cells):
+                out.append(" | ".join(cells))
+        else:
+            _odf_blocks(child, out)
+
+
+def extract_odt_text(path: Path) -> str:
+    with ZipFile(path) as archive:
+        root = ElementTree.fromstring(archive.read("content.xml"))
+    parts: list[str] = []
+    body = root.find("{urn:oasis:names:tc:opendocument:xmlns:office:1.0}body")
+    _odf_blocks(body if body is not None else root, parts)
+    return "\n".join(parts)
+
+
 def extract_pages(path: Path, extension: str) -> list[str]:
-    if extension in {".docx", ".pptx", ".xlsx"}:
+    if extension in {".docx", ".odt", ".pptx", ".xlsx"}:
         with ZipFile(path) as archive:
             if len(archive.infolist()) > 5000 or sum(item.file_size for item in archive.infolist()) > 150 * 1024 * 1024:
                 raise ValueError("Expanded Office document exceeds the 150 MB safety limit")
@@ -54,6 +103,8 @@ def extract_pages(path: Path, extension: str) -> list[str]:
             for row in table.rows:
                 parts.append(" | ".join(cell.text for cell in row.cells))
         return ["\n".join(parts)]
+    if extension == ".odt":
+        return [extract_odt_text(path)]
     if extension == ".pptx":
         presentation = Presentation(path)
         pages = []

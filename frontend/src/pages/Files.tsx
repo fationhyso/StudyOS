@@ -13,13 +13,13 @@ import { api, downloadDocument } from '../lib/api';
 import { cn, formatBytes } from '../lib/utils';
 import type { StudyDocument, SubjectFolder } from '../types';
 
-const accepted = '.pdf,.txt,.md,.png,.jpg,.jpeg,.webp,.docx,.pptx,.xlsx';
+const accepted = '.pdf,.txt,.md,.png,.jpg,.jpeg,.webp,.docx,.odt,.pptx,.xlsx';
 const imageTypes = ['.png', '.jpg', '.jpeg', '.webp'];
 
 function DocumentIcon({ extension, size = 22 }: { extension: string; size?: number }) {
   if (imageTypes.includes(extension)) return <FileImage size={size} />;
   if (extension === '.xlsx') return <FileSpreadsheet size={size} />;
-  if (extension === '.pdf' || extension === '.docx' || extension === '.pptx') return <FileText size={size} />;
+  if (extension === '.pdf' || extension === '.docx' || extension === '.odt' || extension === '.pptx') return <FileText size={size} />;
   return <File size={size} />;
 }
 
@@ -27,7 +27,7 @@ function iconTone(extension: string) {
   if (extension === '.pdf') return 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300';
   if (imageTypes.includes(extension)) return 'bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-300';
   if (extension === '.xlsx') return 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300';
-  if (extension === '.docx' || extension === '.pptx') return 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300';
+  if (extension === '.docx' || extension === '.odt' || extension === '.pptx') return 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-300';
   return 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300';
 }
 
@@ -224,7 +224,7 @@ export default function Files() {
 
   const filtered = documents.filter((doc) => {
     const matchesQuery = doc.name.toLowerCase().includes(query.toLowerCase());
-    const matchesFilter = filter === 'all' || (filter === 'images' ? imageTypes.includes(doc.extension) : filter === 'pdf' ? doc.extension === '.pdf' : filter === 'notes' ? ['.txt', '.md'].includes(doc.extension) : ['.docx', '.pptx', '.xlsx'].includes(doc.extension));
+    const matchesFilter = filter === 'all' || (filter === 'images' ? imageTypes.includes(doc.extension) : filter === 'pdf' ? doc.extension === '.pdf' : filter === 'notes' ? ['.txt', '.md'].includes(doc.extension) : ['.docx', '.odt', '.pptx', '.xlsx'].includes(doc.extension));
     const matchesFolder = activeFolder === 'unfiled' ? doc.folder_id === null : typeof activeFolder === 'number' && doc.folder_id === activeFolder;
     return matchesQuery && matchesFilter && matchesFolder;
   });
