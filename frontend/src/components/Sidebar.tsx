@@ -1,10 +1,12 @@
 import {
   BookOpenText, Bot, CalendarDays, ChevronsLeft, ChevronsRight, FileStack,
-  KeyRound, LayoutDashboard, LogOut, Moon, Plus, Sun, UserRound, X,
+  KeyRound, Smartphone, LayoutDashboard, LogOut, Moon, Plus, Sun, UserRound, X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { useInstallApp } from '../lib/install';
 import { useTheme } from '../context/ThemeContext';
 import { cn, initials } from '../lib/utils';
 import { Logo } from './ui';
@@ -28,12 +30,18 @@ export default function Sidebar({ collapsed, onCollapse, mobileOpen, onMobileClo
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
+  const { mode: installMode, install } = useInstallApp();
+  const { toast } = useToast();
+  const installApp = () => {
+    if (installMode === 'native') void install();
+    else toast('In Safari, tap the Share button, then “Add to Home Screen”.', 'info');
+  };
 
   return (
     <>
       {mobileOpen && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-black/30 backdrop-blur-sm lg:hidden" onClick={onMobileClose} />}
       <aside className={cn(
-        'fixed inset-y-0 left-0 z-40 lg:z-50 flex shrink-0 flex-col border-r border-line bg-sidebar transition-[width,transform] duration-300 lg:static lg:translate-x-0',
+        'safe-top safe-bottom fixed inset-y-0 left-0 z-40 lg:z-50 flex shrink-0 flex-col border-r border-line bg-sidebar transition-[width,transform] duration-300 lg:static lg:translate-x-0',
         collapsed ? 'lg:w-[76px]' : 'lg:w-[248px]',
         'w-[270px]', mobileOpen ? 'translate-x-0' : '-translate-x-full',
       )}>
@@ -66,6 +74,9 @@ export default function Sidebar({ collapsed, onCollapse, mobileOpen, onMobileClo
         </div>
 
         <div className="border-t border-line p-3">
+          {installMode && <button onClick={installApp} className={cn('flex h-10 w-full items-center gap-3 rounded-xl px-3 text-[13px] font-medium text-accent transition hover:bg-surface', collapsed && 'lg:justify-center lg:px-0')} title={collapsed ? 'Install app' : undefined}>
+            <Smartphone size={18} /><span className={cn(collapsed && 'lg:hidden')}>Install app</span>
+          </button>}
           <button onClick={toggleTheme} className={cn('flex h-10 w-full items-center gap-3 rounded-xl px-3 text-[13px] font-medium text-muted transition hover:bg-surface hover:text-ink', collapsed && 'lg:justify-center lg:px-0')} title={collapsed ? `Use ${theme === 'dark' ? 'light' : 'dark'} mode` : undefined}>
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}<span className={cn(collapsed && 'lg:hidden')}>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
           </button>
