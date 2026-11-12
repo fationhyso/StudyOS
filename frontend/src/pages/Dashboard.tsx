@@ -1,5 +1,5 @@
 import {
-  BookOpenText, Bot, CalendarPlus, Check, CheckCircle2, ChevronRight,
+  BookOpenText, CalendarPlus, Check, CheckCircle2, ChevronRight,
   Clock3, FileText, Flame, Library, Sparkles, Target,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -61,7 +61,6 @@ export default function Dashboard() {
         </div>
         <div className="flex gap-2">
           <Link to="/schedule?generate=1"><Button variant="secondary" icon={<CalendarPlus size={16} />}>Plan my week</Button></Link>
-          <Link to="/tutor" className="hidden sm:block"><Button icon={<Sparkles size={16} />}>Study with AI</Button></Link>
         </div>
       </section>
 
@@ -120,7 +119,7 @@ export default function Dashboard() {
 
           <section className="card p-5">
             <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold">Recently opened</h3><Link to="/files" className="text-[11px] font-medium text-accent hover:underline">View library</Link></div>
-            {data.recent_documents.length || data.recent_notes.length ? <div className="space-y-1">{data.recent_notes.slice(0, 2).map((note) => <Link key={`note-${note.id}`} to={`/notes?note=${note.id}`} className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-canvas"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300"><BookOpenText size={15} /></span><div className="min-w-0"><p className="truncate text-xs font-medium">{note.title}</p><p className="mt-0.5 text-[10px] text-muted">Note</p></div></Link>)}{data.recent_documents.slice(0, 2).map((doc) => <Link key={`doc-${doc.id}`} to={`/files/${doc.id}`} className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-canvas"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300"><FileText size={15} /></span><div className="min-w-0"><p className="truncate text-xs font-medium">{doc.name}</p><p className="mt-0.5 text-[10px] text-muted">{doc.extension.replace('.', '').toUpperCase()} document</p></div></Link>)}</div> : <div className="rounded-xl bg-canvas p-4 text-center"><Bot size={18} className="mx-auto text-muted" /><p className="mt-2 text-[11px] leading-5 text-muted">Upload a syllabus and let your tutor help you get started.</p><Link to="/files" className="mt-2 inline-block text-xs font-semibold text-accent">Add your first file</Link></div>}
+            {data.recent_documents.length || data.recent_notes.length ? <div className="space-y-1">{data.recent_notes.slice(0, 2).map((note) => <Link key={`note-${note.id}`} to={`/notes?note=${note.id}`} className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-canvas"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300"><BookOpenText size={15} /></span><div className="min-w-0"><p className="truncate text-xs font-medium">{note.title}</p><p className="mt-0.5 text-[10px] text-muted">Note</p></div></Link>)}{data.recent_documents.slice(0, 2).map((doc) => <Link key={`doc-${doc.id}`} to={`/files/${doc.id}`} className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-canvas"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300"><FileText size={15} /></span><div className="min-w-0"><p className="truncate text-xs font-medium">{doc.name}</p><p className="mt-0.5 text-[10px] text-muted">{doc.extension.replace('.', '').toUpperCase()} document</p></div></Link>)}</div> : <div className="rounded-xl bg-canvas p-4 text-center"><FileText size={18} className="mx-auto text-muted" /><p className="mt-2 text-[11px] leading-5 text-muted">Upload a syllabus or lecture notes to get started.</p><Link to="/files" className="mt-2 inline-block text-xs font-semibold text-accent">Add your first file</Link></div>}
           </section>
         </aside>
       </div>

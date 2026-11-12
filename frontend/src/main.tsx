@@ -22,7 +22,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>,
 );
 
-// Installable app: register the service worker in production builds only, so dev reloads stay fresh.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => undefined); });
+// The installable-app version briefly shipped a service worker; remove it from browsers that picked it up.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => registrations.forEach(registration => registration.unregister())).catch(() => undefined);
+  if ('caches' in window) caches.keys().then(keys => keys.filter(key => key.startsWith('studyos-')).forEach(key => caches.delete(key))).catch(() => undefined);
 }

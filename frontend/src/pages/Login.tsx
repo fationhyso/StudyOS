@@ -45,7 +45,7 @@ export default function Login() {
         <div className="relative my-auto max-w-lg">
           <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-emerald-50"><Sparkles size={14} />A calmer way to learn</div>
           <h1 className="text-5xl font-semibold leading-[1.08] tracking-[-.05em] xl:text-6xl">Make space for<br />what matters.</h1>
-          <p className="mt-6 max-w-md text-base leading-7 text-emerald-50/70">Turn scattered materials into a focused plan. Your notes, schedule, files, and personal study tutor—in one private workspace.</p>
+          <p className="mt-6 max-w-md text-base leading-7 text-emerald-50/70">Turn scattered materials into a focused plan. Your notes, schedule, and files—in one private workspace.</p>
           <div className="mt-10 space-y-4">
             {['A study plan that adapts to your goals', 'Answers with citations from your own files', 'Self-hosted, private, and always yours'].map((item) => <div key={item} className="flex items-center gap-3 text-sm text-emerald-50/85"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10"><Check size={12} /></span>{item}</div>)}
           </div>

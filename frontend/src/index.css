@@ -42,11 +42,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .icon-btn { @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-canvas hover:text-ink active:scale-95 disabled:pointer-events-none disabled:opacity-40; }
   .label { @apply mb-1.5 block text-xs font-semibold text-ink; }
   .subtle-scrollbar { scrollbar-width: thin; }
-  /* Keep content clear of the notch and home indicator when installed as an app. */
-  .safe-top { padding-top: env(safe-area-inset-top); }
-  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-  .mobile-menu-btn { top: calc(env(safe-area-inset-top) + 0.75rem); left: calc(env(safe-area-inset-left) + 0.75rem); }
-  .mobile-main { padding-top: calc(env(safe-area-inset-top) + 3.5rem); padding-bottom: env(safe-area-inset-bottom); }
 }
 
 .markdown-body { @apply text-[15px] leading-7 text-ink; overflow-wrap: anywhere; }
@@ -84,8 +79,3 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .markdown-body .katex { font-size: 1.08em; }
 .markdown-body .katex-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: .35rem 0; }
 
-/* The composer provides a rounded focus indicator around the entire input. */
-.tutor-message-input:focus-visible {
-  outline: none;
-  box-shadow: none;
-}

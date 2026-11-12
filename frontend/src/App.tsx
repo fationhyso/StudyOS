@@ -9,9 +9,8 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Schedule = lazy(() => import('./pages/Schedule'));
 const Notes = lazy(() => import('./pages/Notes'));
 const Files = lazy(() => import('./pages/Files'));
-const AiTutor = lazy(() => import('./pages/AiTutor'));
 
-const Integrations = lazy(() => import('./pages/Integrations'));
+const Settings = lazy(() => import('./pages/Settings'));
 
 function Protected() {
   const { user, loading } = useAuth();
@@ -30,8 +29,8 @@ export default function App() {
           <Route path="/notes" element={<Notes />} />
           <Route path="/files" element={<Files />} />
           <Route path="/files/:documentId" element={<Files />} />
-          <Route path="/tutor" element={<AiTutor />} />
-          <Route path="/integrations" element={<Integrations />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/integrations" element={<Navigate to="/settings" replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
