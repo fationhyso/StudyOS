@@ -1,6 +1,6 @@
 import {
-  BookOpenText, CalendarDays, ChevronsLeft, ChevronsRight, FileStack,
-  LayoutDashboard, LogOut, Moon, Plus, Settings, Sun, UserRound, X,
+  CalendarDays, ChevronsLeft, ChevronsRight, FileStack,
+  LayoutDashboard, LogOut, Moon, Settings, Sun, UserRound, X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
@@ -12,7 +12,6 @@ import { Logo } from './ui';
 const navigation = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/schedule', label: 'Schedule', icon: CalendarDays },
-  { to: '/notes', label: 'Notes & docs', icon: BookOpenText },
   { to: '/files', label: 'Files & resources', icon: FileStack },
 ];
 
@@ -42,9 +41,6 @@ export default function Sidebar({ collapsed, onCollapse, mobileOpen, onMobileClo
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-4">
-          <button onClick={() => { navigate('/notes?new=1'); onMobileClose(); }} className={cn('mb-5 flex h-10 w-full items-center gap-2.5 rounded-xl border border-line bg-surface text-sm font-medium shadow-sm transition hover:border-accent/40 hover:text-accent', collapsed ? 'lg:justify-center lg:px-0' : 'px-3', 'justify-start px-3')}>
-            <Plus size={17} /><span className={cn(collapsed && 'lg:hidden')}>New note</span>
-          </button>
           <p className={cn('mb-2 px-3 text-[10px] font-semibold uppercase tracking-[.14em] text-muted', collapsed && 'lg:hidden')}>Workspace</p>
           <nav className="space-y-1" aria-label="Main navigation">
             {navigation.map(({ to, label, icon: Icon, end }) => (

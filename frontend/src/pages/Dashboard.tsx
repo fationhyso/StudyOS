@@ -1,5 +1,5 @@
 import {
-  BookOpenText, CalendarPlus, Check, CheckCircle2, ChevronRight,
+  CalendarPlus, Check, CheckCircle2, ChevronRight,
   Clock3, FileText, Flame, Library, Sparkles, Target,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -69,7 +69,7 @@ export default function Dashboard() {
         {user && <ExamCountdown key={user.id} userId={user.id} />}
         <StatCard label="Today's progress" value={`${stats.today_completed}/${stats.today_sessions}`} detail="study sessions completed" icon={<Target size={16} />} tone="bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" />
         <StatCard label="Study streak" value={`${stats.streak} ${stats.streak === 1 ? 'day' : 'days'}`} detail={stats.streak ? 'Keep the momentum going' : 'Complete a session to begin'} icon={<Flame size={16} />} tone="bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" />
-        <StatCard label="Study library" value={stats.documents} detail={`${stats.notes} ${stats.notes === 1 ? 'note' : 'notes'} in your workspace`} icon={<Library size={16} />} tone="bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300" />
+        <StatCard label="Study library" value={stats.documents} detail={`${stats.documents === 1 ? 'file' : 'files'} in your library`} icon={<Library size={16} />} tone="bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300" />
       </section>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-12">
@@ -119,7 +119,7 @@ export default function Dashboard() {
 
           <section className="card p-5">
             <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold">Recently opened</h3><Link to="/files" className="text-[11px] font-medium text-accent hover:underline">View library</Link></div>
-            {data.recent_documents.length || data.recent_notes.length ? <div className="space-y-1">{data.recent_notes.slice(0, 2).map((note) => <Link key={`note-${note.id}`} to={`/notes?note=${note.id}`} className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-canvas"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300"><BookOpenText size={15} /></span><div className="min-w-0"><p className="truncate text-xs font-medium">{note.title}</p><p className="mt-0.5 text-[10px] text-muted">Note</p></div></Link>)}{data.recent_documents.slice(0, 2).map((doc) => <Link key={`doc-${doc.id}`} to={`/files/${doc.id}`} className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-canvas"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300"><FileText size={15} /></span><div className="min-w-0"><p className="truncate text-xs font-medium">{doc.name}</p><p className="mt-0.5 text-[10px] text-muted">{doc.extension.replace('.', '').toUpperCase()} document</p></div></Link>)}</div> : <div className="rounded-xl bg-canvas p-4 text-center"><FileText size={18} className="mx-auto text-muted" /><p className="mt-2 text-[11px] leading-5 text-muted">Upload a syllabus or lecture notes to get started.</p><Link to="/files" className="mt-2 inline-block text-xs font-semibold text-accent">Add your first file</Link></div>}
+            {data.recent_documents.length ? <div className="space-y-1">{data.recent_documents.slice(0, 4).map((doc) => <Link key={`doc-${doc.id}`} to={`/files/${doc.id}`} className="flex items-center gap-3 rounded-lg p-2 transition hover:bg-canvas"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300"><FileText size={15} /></span><div className="min-w-0"><p className="truncate text-xs font-medium">{doc.name}</p><p className="mt-0.5 text-[10px] text-muted">{doc.extension.replace('.', '').toUpperCase()} document</p></div></Link>)}</div> : <div className="rounded-xl bg-canvas p-4 text-center"><FileText size={18} className="mx-auto text-muted" /><p className="mt-2 text-[11px] leading-5 text-muted">Upload a syllabus or lecture notes to get started.</p><Link to="/files" className="mt-2 inline-block text-xs font-semibold text-accent">Add your first file</Link></div>}
           </section>
         </aside>
       </div>

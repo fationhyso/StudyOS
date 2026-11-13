@@ -7,7 +7,6 @@ import { LoadingScreen } from './components/ui';
 const Login = lazy(() => import('./pages/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Schedule = lazy(() => import('./pages/Schedule'));
-const Notes = lazy(() => import('./pages/Notes'));
 const Files = lazy(() => import('./pages/Files'));
 
 const Settings = lazy(() => import('./pages/Settings'));
@@ -26,7 +25,6 @@ export default function App() {
         <Route element={<Protected />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/schedule" element={<Schedule />} />
-          <Route path="/notes" element={<Notes />} />
           <Route path="/files" element={<Files />} />
           <Route path="/files/:documentId" element={<Files />} />
           <Route path="/settings" element={<Settings />} />

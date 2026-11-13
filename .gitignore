@@ -40,3 +40,6 @@ __pycache__/
 data/
 backend/data/
 .DS_Store
+
+# Personal iOS app (sideloaded with AltStore, not published)
+StudyOS-iOS/
