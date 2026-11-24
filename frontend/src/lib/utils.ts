@@ -50,7 +50,7 @@ export function greeting() {
 }
 
 export const sessionColors: Record<string, string> = {
-  study: 'border-l-emerald-500 bg-emerald-50/80 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-100',
-  review: 'border-l-amber-500 bg-amber-50/80 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100',
-  practice: 'border-l-violet-500 bg-violet-50/80 text-violet-950 dark:bg-violet-950/30 dark:text-violet-100',
+  study: 'border-l-emerald-500 bg-emerald-500/[.11] text-emerald-950 ring-emerald-600/15 dark:bg-emerald-400/[.10] dark:text-emerald-50 dark:ring-emerald-300/10',
+  review: 'border-l-amber-500 bg-amber-500/[.12] text-amber-950 ring-amber-600/15 dark:bg-amber-400/[.10] dark:text-amber-50 dark:ring-amber-300/10',
+  practice: 'border-l-violet-500 bg-violet-500/[.11] text-violet-950 ring-violet-600/15 dark:bg-violet-400/[.11] dark:text-violet-50 dark:ring-violet-300/10',
 };

@@ -19,10 +19,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="pointer-events-none fixed bottom-5 right-5 z-[100] flex w-[min(380px,calc(100vw-40px))] flex-col gap-2" aria-live="polite">
         {items.map((item) => (
-          <div key={item.id} className="pointer-events-auto flex items-start gap-3 rounded-xl border border-line bg-surface p-3.5 text-sm text-ink shadow-float animate-slide-up">
+          <div key={item.id} className="pointer-events-auto flex items-start gap-3 glass-raised rounded-2xl p-3.5 text-sm text-ink animate-slide-up">
             {item.kind === 'success' ? <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-600" /> : item.kind === 'error' ? <CircleAlert size={18} className="mt-0.5 shrink-0 text-red-500" /> : <Info size={18} className="mt-0.5 shrink-0 text-blue-500" />}
             <span className="flex-1 leading-5">{item.message}</span>
-            <button className="rounded p-0.5 text-muted hover:bg-canvas hover:text-ink" onClick={() => dismiss(item.id)} aria-label="Dismiss notification"><X size={15} /></button>
+            <button className="rounded-lg p-0.5 text-muted hover:bg-canvas hover:text-ink" onClick={() => dismiss(item.id)} aria-label="Dismiss notification"><X size={15} /></button>
           </div>
         ))}
       </div>

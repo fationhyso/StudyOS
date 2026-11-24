@@ -2,46 +2,160 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Glass system
+ * ------------
+ * Surfaces are translucent panes over a still field of light (`.backdrop-light`).
+ * Each surface token is an RGB triplet plus a default alpha, so `bg-surface`
+ * is frosted by default and `bg-surface/60` scales that alpha rather than
+ * replacing it (see tailwind.config.js).
+ */
 :root {
-  --canvas: 247 248 246;
-  --surface: 255 255 255;
-  --sidebar: 243 244 241;
-  --ink: 32 35 31;
-  --muted: 116 121 113;
-  --line: 228 230 225;
+  --base: 236 241 237;
+  --surface: 255 255 255;   --surface-a: .58;
+  --raised: 255 255 255;    --raised-a: .82;
+  --canvas: 34 62 46;       --canvas-a: .055;
+  --sidebar: 255 255 255;   --sidebar-a: .46;
+  --line: 32 56 42;         --line-a: .11;
+  --ink: 22 32 26;
+  --muted: 92 106 98;
+
+  --edge: 255 255 255 / .72;           /* lit top edge of a pane */
+  --rim: 255 255 255 / .55;            /* pane outline */
+  --shade: 26 48 36;                   /* shadow tint */
+  --pool-1: 166 205 178;               /* sage */
+  --pool-2: 178 206 234;               /* sky */
+  --pool-3: 246 214 178;               /* warm sun */
+  --pool-4: 206 196 236;               /* lilac haze */
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
 .dark {
-  --canvas: 18 20 17;
-  --surface: 27 29 25;
-  --sidebar: 22 24 21;
-  --ink: 232 234 229;
-  --muted: 151 157 147;
-  --line: 53 56 49;
+  --base: 10 16 14;
+  --surface: 28 38 33;      --surface-a: .52;
+  --raised: 30 40 35;       --raised-a: .86;
+  --canvas: 255 255 255;    --canvas-a: .05;
+  --sidebar: 22 30 26;      --sidebar-a: .5;
+  --line: 214 236 222;      --line-a: .09;
+  --ink: 230 238 232;
+  --muted: 150 164 155;
+
+  --edge: 255 255 255 / .09;
+  --rim: 255 255 255 / .07;
+  --shade: 0 0 0;
+  --pool-1: 34 86 62;
+  --pool-2: 30 56 96;
+  --pool-3: 78 56 26;
+  --pool-4: 56 40 92;
 }
 
-* { border-color: rgb(var(--line)); }
-html { scroll-behavior: smooth; }
-body { @apply m-0 min-w-[320px] bg-canvas font-sans text-ink antialiased; }
+* { border-color: rgb(var(--line) / var(--line-a)); }
+html { scroll-behavior: smooth; background: rgb(var(--base)); }
+body { @apply m-0 min-w-[320px] font-sans text-ink antialiased; background: rgb(var(--base)); }
 button, input, textarea, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
-button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
-  @apply outline-none ring-2 ring-accent/50 ring-offset-2 ring-offset-surface;
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+  @apply outline-none ring-2 ring-accent/60;
 }
-::selection { @apply bg-accent/20 text-ink; }
+::selection { @apply bg-accent/25 text-ink; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { @apply rounded-full bg-line; }
-::-webkit-scrollbar-thumb:hover { background: rgb(var(--muted) / .45); }
+::-webkit-scrollbar-thumb { border-radius: 999px; background: rgb(var(--ink) / .14); }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--ink) / .26); }
+
+/* The field of light every pane floats over. Fixed and still: it is the room, not a decoration. */
+.backdrop-light {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(42vmax 36vmax at 8% 6%, rgb(var(--pool-1) / .9), transparent 70%),
+    radial-gradient(38vmax 34vmax at 96% 14%, rgb(var(--pool-2) / .85), transparent 70%),
+    radial-gradient(46vmax 30vmax at 62% 104%, rgb(var(--pool-3) / .8), transparent 72%),
+    radial-gradient(30vmax 28vmax at 30% 70%, rgb(var(--pool-4) / .45), transparent 70%),
+    rgb(var(--base));
+}
+.backdrop-light::after {
+  /* Fine grain keeps the gradients from banding and gives the glass something to diffuse. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: .05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Anything painted with the surface or raised tokens is frosted. */
+.bg-surface, [class*='bg-surface/'], .bg-raised, [class*='bg-raised/'], .bg-sidebar {
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+}
 
 @layer components {
-  .card { @apply rounded-2xl border border-line bg-surface shadow-soft; }
-  .field { @apply w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-muted/70 transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15; }
-  .icon-btn { @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-canvas hover:text-ink active:scale-95 disabled:pointer-events-none disabled:opacity-40; }
+  .glass {
+    background: rgb(var(--surface) / var(--surface-a));
+    -webkit-backdrop-filter: blur(24px) saturate(170%);
+    backdrop-filter: blur(24px) saturate(170%);
+    border: 1px solid rgb(var(--rim));
+    box-shadow:
+      inset 0 1px 0 rgb(var(--edge)),
+      0 1px 2px rgb(var(--shade) / .05),
+      0 18px 48px -20px rgb(var(--shade) / .22);
+  }
+  .glass-raised {
+    background: rgb(var(--raised) / var(--raised-a));
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    backdrop-filter: blur(32px) saturate(180%);
+    border: 1px solid rgb(var(--rim));
+    box-shadow:
+      inset 0 1px 0 rgb(var(--edge)),
+      0 2px 6px rgb(var(--shade) / .06),
+      0 30px 70px -24px rgb(var(--shade) / .34);
+  }
+  .card { @apply glass rounded-[20px]; }
+  .field {
+    @apply w-full rounded-xl border bg-canvas px-3.5 py-2.5 text-sm text-ink placeholder:text-muted/70 transition focus:border-accent/60 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-accent/15;
+  }
+  .icon-btn { @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted transition hover:bg-canvas hover:text-ink active:scale-95 disabled:pointer-events-none disabled:opacity-40; }
   .label { @apply mb-1.5 block text-xs font-semibold text-ink; }
   .subtle-scrollbar { scrollbar-width: thin; }
+  /* Icon chip: a small tinted lens used beside headings and stats. */
+  .chip { @apply flex shrink-0 items-center justify-center rounded-xl; box-shadow: inset 0 1px 0 rgb(var(--edge)); }
+
+  /* Page headings share one scale across Dashboard, Schedule, Files and Settings. */
+  .page-title { @apply text-[28px] font-semibold leading-[1.1] tracking-[-.05em] sm:text-[34px]; }
+  .page-sub { @apply mt-1.5 text-sm text-muted; }
+
+  /* Segmented control: a recessed glass track with a raised pane for the chosen option. */
+  .segmented { @apply inline-flex h-10 items-center gap-0.5 rounded-[14px] bg-canvas p-1; box-shadow: inset 0 1px 2px rgb(var(--shade) / .06); }
+  .segment { @apply flex h-8 items-center justify-center gap-1.5 rounded-[10px] px-2.5 text-xs font-medium text-muted transition hover:text-ink disabled:pointer-events-none disabled:opacity-40; }
+  .segment[aria-pressed='true'] { @apply bg-raised text-ink shadow-sm; }
+
+  /* Filter pill: same idea as a segment, used in scrolling rows. */
+  .pill { @apply whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium text-muted transition hover:bg-canvas hover:text-ink; }
+  .pill[aria-pressed='true'] { @apply bg-raised text-ink shadow-sm ring-1 ring-[rgb(var(--rim))]; }
+
+  /* Choice tile (durations, weekdays, shortcuts) in forms. */
+  .choice { @apply rounded-[10px] bg-canvas px-2.5 py-1.5 text-xs font-medium text-muted transition hover:text-ink; }
+  .choice[aria-pressed='true'] { @apply bg-accent text-white; box-shadow: inset 0 1px 0 rgb(255 255 255 / .25), 0 4px 12px -4px rgb(46 88 62 / .55); }
+
+  /* An inset group inside a dialog or card. */
+  .well { @apply rounded-2xl bg-canvas p-4; }
+
+  kbd { @apply inline-flex min-w-[1.4rem] items-center justify-center rounded-md bg-surface px-1.5 py-0.5 font-sans text-[10px] font-semibold text-ink shadow-sm; }
+}
+
+/* Without backdrop-filter, translucent panes would be unreadable; fall back to near-opaque. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --surface-a: .94; --raised-a: .98; --sidebar-a: .94; }
+  .dark { --surface-a: .95; --raised-a: .98; --sidebar-a: .95; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root { --surface-a: .94; --raised-a: .98; --sidebar-a: .94; }
+  .dark { --surface-a: .95; --raised-a: .98; --sidebar-a: .95; }
 }
 
 .markdown-body { @apply text-[15px] leading-7 text-ink; overflow-wrap: anywhere; }
@@ -59,7 +173,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .markdown-body pre { @apply my-4 overflow-auto rounded-xl bg-canvas p-4; }
 .markdown-body pre code { @apply bg-transparent p-0; }
 .markdown-body table { @apply my-4 w-full border-collapse text-sm; }
-.markdown-body th, .markdown-body td { @apply border border-line p-2 text-left; }
+.markdown-body th, .markdown-body td { @apply border p-2 text-left; }
 .markdown-body hr { @apply my-6; }
 .markdown-body mark, .pdf-highlight { @apply rounded-sm bg-yellow-200/80 px-0.5 text-inherit dark:bg-yellow-500/50; }
 
@@ -78,4 +192,3 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 .markdown-body .katex { font-size: 1.08em; }
 .markdown-body .katex-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: .35rem 0; }
-
